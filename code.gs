@@ -19,7 +19,7 @@ function getSS() {
 // ----------------------------------------------------
 function cleanUpData() {
   const ss = getSS();
-  const sheets = ['Pengguna', 'Aktivitas', 'Dokumen Masuk', 'Dokumen Keluar', 'Klasifikasi Arsip'];
+  const sheets = ['Pengguna', 'Aktivitas', 'Naskah Masuk', 'Naskah Keluar', 'Klasifikasi Arsip'];
   
   sheets.forEach(sheetName => {
     let sheet = ss.getSheetByName(sheetName);
@@ -40,51 +40,62 @@ function cleanUpData() {
 function setupHeaders() {
   const ss = getSS();
   
+  // Helper to ensure sheet exists
+  const getOrCreateSheet = (name) => {
+    let s = ss.getSheetByName(name);
+    if (!s) s = ss.insertSheet(name);
+    return s;
+  };
+
   // Pengguna
-  let sh = ss.getSheetByName('Pengguna');
+  let sh = getOrCreateSheet('Pengguna');
   if (sh.getLastRow() <= 1) {
-    // Jika kosong atau hanya header, tulis/timpa header dan tambahkan akun
     if (sh.getLastRow() === 0) {
       sh.appendRow(['ID', 'Username', 'Password', 'Role', 'Status']);
     }
-    sh.appendRow(['1', 'admin', 'admin', 'Admin', 'Aktif']);
-    sh.appendRow(['2', 'user', 'user', 'Perangkat Desa', 'Aktif']);
+    // Pastikan tidak menduplikasi jika sudah ada data tapi kurang dari 2 baris
+    if (sh.getLastRow() === 1) {
+      sh.appendRow(['1', 'admin', 'admin', 'Admin', 'Aktif']);
+      sh.appendRow(['2', 'user', 'user', 'Perangkat Desa', 'Aktif']);
+    }
   }
   
   // Aktivitas
-  sh = ss.getSheetByName('Aktivitas');
+  sh = getOrCreateSheet('Aktivitas');
   if(sh.getLastRow() === 0) {
     sh.appendRow(['Timestamp', 'Username', 'Aktivitas', 'Detail']);
   }
 
-  // Dokumen Masuk
-  sh = ss.getSheetByName('Dokumen Masuk');
+  // Naskah Masuk
+  sh = getOrCreateSheet('Naskah Masuk');
   if(sh.getLastRow() === 0) {
     sh.appendRow(['Nomor Indeks', 'Nomor Agenda', 'Kode Klasifikasi', 'Nomor Surat', 'Tanggal Surat', 'Tanggal Terima', 'Asal Instansi', 'Perihal', 'Sifat Surat', 'Bidang', 'Disposisi', 'Status Arsip', 'Keterangan', 'Diinput Oleh', 'Link File']);
   }
 
-  // Dokumen Keluar
-  sh = ss.getSheetByName('Dokumen Keluar');
+  // Naskah Keluar
+  sh = getOrCreateSheet('Naskah Keluar');
   if(sh.getLastRow() === 0) {
     sh.appendRow(['Nomor Indeks', 'Nomor Agenda', 'Kode Klasifikasi', 'Nomor Surat', 'Tanggal Surat', 'Tujuan Instansi', 'Perihal', 'Sifat Surat', 'Bidang', 'Status Arsip', 'Keterangan', 'Diinput Oleh', 'Link File']);
   }
 
   // Klasifikasi Arsip (Sesuai Permintaan User)
-  sh = ss.getSheetByName('Klasifikasi Arsip');
+  sh = getOrCreateSheet('Klasifikasi Arsip');
   if(sh.getLastRow() <= 1) {
     if(sh.getLastRow() === 0) {
       sh.appendRow(['Baris', 'Kode', 'Nama Bidang', 'Jenis Arsip', 'Retensi Aktif', 'Retensi Inaktif']);
     }
-    const klasifikasiAwal = [
-      ['2', '470.1', 'Kependudukan', 'Kelahiran / Akte Lahir', '', ''],
-      ['3', '470.2', 'Kependudukan', 'Kematian / Akte Kematian', '', ''],
-      ['4', '470.3', 'Kependudukan', 'Perkawinan / Akte Nikah', '', ''],
-      ['5', '470.4', 'Kependudukan', 'Perceraian', '', ''],
-      ['6', '470.5', 'Kependudukan', 'KTP / KK / Domisili', '', ''],
-      ['7', '590.1', 'Pertanahan', 'Setifikat / Kepemilikan', '', ''],
-      ['8', '590.2', 'Pertanahan', 'Hibah / Waris Tanah', '', '']
-    ];
-    klasifikasiAwal.forEach(row => sh.appendRow(row));
+    if(sh.getLastRow() === 1) {
+      const klasifikasiAwal = [
+        ['2', '470.1', 'Kependudukan', 'Kelahiran / Akte Lahir', '', ''],
+        ['3', '470.2', 'Kependudukan', 'Kematian / Akte Kematian', '', ''],
+        ['4', '470.3', 'Kependudukan', 'Perkawinan / Akte Nikah', '', ''],
+        ['5', '470.4', 'Kependudukan', 'Perceraian', '', ''],
+        ['6', '470.5', 'Kependudukan', 'KTP / KK / Domisili', '', ''],
+        ['7', '590.1', 'Pertanahan', 'Setifikat / Kepemilikan', '', ''],
+        ['8', '590.2', 'Pertanahan', 'Hibah / Waris Tanah', '', '']
+      ];
+      klasifikasiAwal.forEach(row => sh.appendRow(row));
+    }
   }
 }
 
@@ -149,8 +160,8 @@ function getDashboardData() {
   try {
     setupHeaders(); // Pastikan header dan data awal tersedia
     const ss = getSS();
-    const arsipMasukSheet = ss.getSheetByName('Dokumen Masuk');
-    const arsipKeluarSheet = ss.getSheetByName('Dokumen Keluar');
+    const arsipMasukSheet = ss.getSheetByName('Naskah Masuk');
+    const arsipKeluarSheet = ss.getSheetByName('Naskah Keluar');
     const klasifikasiSheet = ss.getSheetByName('Klasifikasi Arsip');
     
     let masukCount = 0, keluarCount = 0;
@@ -167,7 +178,10 @@ function getDashboardData() {
       const klasData = klasifikasiSheet.getRange(2, 3, klasifikasiSheet.getLastRow() - 1, 1).getValues(); 
       klasData.forEach(row => {
         let b = row[0];
-        if(b && b.trim() !== "") bidangMap[b.trim()] = 0;
+        if(b) {
+          b = b.toString().trim();
+          if(b !== "") bidangMap[b] = 0;
+        }
       });
     }
 
@@ -210,11 +224,11 @@ function getArsipData() {
     const ss = getSS();
     let result = [];
     
-    const masukSheet = ss.getSheetByName('Dokumen Masuk');
+    const masukSheet = ss.getSheetByName('Naskah Masuk');
     if (masukSheet && masukSheet.getLastRow() > 1) {
       const mData = masukSheet.getRange(2, 1, masukSheet.getLastRow() - 1, 15).getValues();
       mData.forEach(row => {
-        if(!row[0]) return;
+        if(!row[0] && !row[3]) return;
         result.push({
           jenis: 'Masuk',
           noIndeks: row[0],
@@ -223,16 +237,18 @@ function getArsipData() {
           perihal: row[7],
           sifatSurat: row[8],
           bidang: row[9],
+          asalInstansi: row[6],
+          keterangan: row[12],
           linkFile: row[14]
         });
       });
     }
 
-    const keluarSheet = ss.getSheetByName('Dokumen Keluar');
+    const keluarSheet = ss.getSheetByName('Naskah Keluar');
     if (keluarSheet && keluarSheet.getLastRow() > 1) {
       const kData = keluarSheet.getRange(2, 1, keluarSheet.getLastRow() - 1, 13).getValues();
       kData.forEach(row => {
-        if(!row[0]) return;
+        if(!row[0] && !row[3]) return;
         result.push({
           jenis: 'Keluar',
           noIndeks: row[0],
@@ -241,6 +257,8 @@ function getArsipData() {
           perihal: row[6],
           sifatSurat: row[7],
           bidang: row[8],
+          tujuanInstansi: row[5],
+          keterangan: row[10],
           linkFile: row[12]
         });
       });
@@ -286,13 +304,17 @@ function getUsers() {
   }
 }
 
-function downloadDataArsip(username) {
-  logActivity(username || 'Sistem', 'Download Excel', 'Mendownload rekap data arsip format Excel');
+function downloadDataArsip(username, startDate, endDate) {
+  let detail = 'Mendownload rekap data arsip format Excel';
+  if (startDate && endDate) detail += ` (${startDate} s/d ${endDate})`;
+  logActivity(username || 'Sistem', 'Download Excel', detail);
   return "https://docs.google.com/spreadsheets/d/" + SPREADSHEET_ID + "/export?format=xlsx";
 }
 
-function downloadDataZip(username) {
-  logActivity(username || 'Sistem', 'Download ZIP', 'Mencoba download ZIP arsip (Redirect ke Spreadsheet)');
+function downloadDataZip(username, startDate, endDate) {
+  let detail = 'Mencoba download ZIP arsip (Redirect ke Spreadsheet)';
+  if (startDate && endDate) detail += ` (${startDate} s/d ${endDate})`;
+  logActivity(username || 'Sistem', 'Download ZIP', detail);
   return "https://docs.google.com/spreadsheets/d/" + SPREADSHEET_ID + "/export?format=xlsx";
 }
 
@@ -301,7 +323,7 @@ function downloadDataZip(username) {
 // ----------------------------------------------------
 function saveArsip(type, data, username) {
   try {
-    const sheetName = type === 'Masuk' ? 'Dokumen Masuk' : 'Dokumen Keluar';
+    const sheetName = type === 'Masuk' ? 'Naskah Masuk' : 'Naskah Keluar';
     const sheet = getSS().getSheetByName(sheetName);
     if (!sheet) return { success: false, message: 'Sheet ' + sheetName + ' tidak ditemukan.' };
 
@@ -360,7 +382,7 @@ function saveArsipWithFile(type, data, username, base64Data, fileName) {
 
   // === STEP 2: Save data to Sheet (always executed) ===
   try {
-    const sheetName = type === 'Masuk' ? 'Dokumen Masuk' : 'Dokumen Keluar';
+    const sheetName = type === 'Masuk' ? 'Naskah Masuk' : 'Naskah Keluar';
     const sheet = getSS().getSheetByName(sheetName);
     if (!sheet) return { success: false, message: 'Sheet ' + sheetName + ' tidak ditemukan.' };
 
