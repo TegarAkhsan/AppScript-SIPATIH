@@ -458,3 +458,37 @@ function uploadFile(base64Data, fileName) {
     return { success: false, message: e.message };
   }
 }
+function deleteBidang(nama, username) {
+  try {
+    const sheet = getSS().getSheetByName('Klasifikasi Arsip');
+    const data = sheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][2] === nama) {
+        sheet.deleteRow(i + 1);
+        logActivity(username, 'Hapus Bidang', 'Menghapus bidang: ' + nama);
+        return { success: true };
+      }
+    }
+    return { success: false, message: 'Bidang tidak ditemukan' };
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+}
+
+function updateBidang(oldNama, newData, username) {
+  try {
+    const sheet = getSS().getSheetByName('Klasifikasi Arsip');
+    const data = sheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][2] === oldNama) {
+        sheet.getRange(i + 1, 2).setValue(newData.kode);
+        sheet.getRange(i + 1, 3).setValue(newData.nama);
+        logActivity(username, 'Update Bidang', 'Mengupdate bidang: ' + oldNama + ' menjadi ' + newData.nama);
+        return { success: true };
+      }
+    }
+    return { success: false, message: 'Bidang tidak ditemukan' };
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+}

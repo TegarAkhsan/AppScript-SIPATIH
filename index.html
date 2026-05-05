@@ -667,15 +667,28 @@
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         <template x-for="bidang in dashboardData?.bidangList" :key="bidang.kode">
-                            <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 card-hover cursor-pointer"
+                            <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 card-hover cursor-pointer relative group/card"
                                 @click="viewArsipBidang(bidang.nama)">
                                 <div class="flex justify-between items-start mb-4">
                                     <div
                                         class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl">
                                         <i class="fas fa-folder"></i>
                                     </div>
-                                    <span class="px-2.5 py-1 bg-gray-100 text-gray-600 text-xs font-semibold rounded-lg"
-                                        x-text="'Kode: ' + bidang.kode"></span>
+                                    <div class="flex flex-col items-end gap-2">
+                                        <span class="px-2.5 py-1 bg-gray-100 text-gray-600 text-xs font-semibold rounded-lg"
+                                            x-text="'Kode: ' + bidang.kode"></span>
+                                        <!-- Actions (Hidden by default, shown on hover or for admin) -->
+                                        <div class="flex gap-1 opacity-0 group-hover/card:opacity-100 transition-opacity">
+                                            <button @click.stop="openForm('bidang', bidang)"
+                                                class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center justify-center transition-colors">
+                                                <i class="fas fa-edit text-xs"></i>
+                                            </button>
+                                            <button @click.stop="confirmDeleteBidang(bidang)"
+                                                class="w-8 h-8 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center transition-colors">
+                                                <i class="fas fa-trash text-xs"></i>
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                                 <h3 class="text-lg font-bold text-gray-900 mb-1" x-text="bidang.nama"></h3>
                                 <p class="text-sm text-gray-500 mb-4"><span x-text="bidang.jumlah"></span> Dokumen Arsip
@@ -951,7 +964,7 @@
                 toast: { show: false, message: '', type: 'info' },
                 errorModal: { show: false, message: '' },
                 preview: { show: false, url: '', title: '' },
-                formModal: { show: false, type: '', title: '' },
+                formModal: { show: false, type: '', title: '', isEdit: false, oldNama: '' },
 
                 formData: { fileName: '', fileData: '', sifatSurat: 'Biasa', keterangan: '' },
                 filterDownload: { startDate: '', endDate: '' },
@@ -966,11 +979,44 @@
                 },
 
                 init() {
+                    this.checkSession();
+                    // Jalankan pengecekan sesi setiap 1 menit
+                    setInterval(() => this.checkSession(), 60000);
+                    
+                    // Pantau aktivitas user untuk memperbarui timestamp
+                    ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'].forEach(name => {
+                        document.addEventListener(name, () => this.updateActivity());
+                    });
+                },
+
+                updateActivity() {
+                    if (this.user) {
+                        localStorage.setItem('sipatih_last_activity', Date.now().toString());
+                    }
+                },
+
+                checkSession() {
                     const savedUser = localStorage.getItem('sipatih_user');
-                    if (savedUser) {
-                        this.user = JSON.parse(savedUser);
-                        this.loadDashboard(); // Load data
-                        this.navigate('dashboard');
+                    const lastActivity = localStorage.getItem('sipatih_last_activity');
+                    const now = Date.now();
+                    const timeout = 30 * 60 * 1000; // 30 menit
+
+                    if (savedUser && lastActivity) {
+                        if (now - parseInt(lastActivity) > timeout) {
+                            this.user = null;
+                            localStorage.removeItem('sipatih_user');
+                            localStorage.removeItem('sipatih_last_activity');
+                            this.navigate('login');
+                            this.showError('Sesi Anda telah berakhir (30 menit tidak ada aktivitas). Silakan login kembali.');
+                        } else {
+                            this.user = JSON.parse(savedUser);
+                            if (this.view === 'login') {
+                                this.loadDashboard();
+                                this.navigate('dashboard');
+                            }
+                        }
+                    } else if (this.view !== 'login' && !savedUser) {
+                        this.navigate('login');
                     }
                 },
 
@@ -995,14 +1041,53 @@
                     this.preview.show = true;
                 },
 
-                openForm(type) {
+                openForm(type, item = null) {
                     this.formModal.type = type;
-                    this.formData = { fileName: '', fileData: '', sifatSurat: 'Biasa', keterangan: '' };
-                    if (type === 'naskah_masuk') this.formModal.title = 'Input Naskah Masuk';
-                    if (type === 'naskah_keluar') this.formModal.title = 'Input Naskah Keluar';
-                    if (type === 'pengguna') this.formModal.title = 'Tambah Pengguna';
-                    if (type === 'bidang') this.formModal.title = 'Tambah Kategori Bidang';
+                    this.formModal.isEdit = !!item;
+                    
+                    if (item) {
+                        this.formData = { ...item };
+                        if (type === 'bidang') {
+                            this.formModal.oldNama = item.nama;
+                            this.formModal.title = 'Edit Kategori Bidang';
+                        }
+                    } else {
+                        this.formData = { fileName: '', fileData: '', sifatSurat: 'Biasa', keterangan: '' };
+                        if (type === 'naskah_masuk') this.formModal.title = 'Input Naskah Masuk';
+                        if (type === 'naskah_keluar') this.formModal.title = 'Input Naskah Keluar';
+                        if (type === 'pengguna') this.formModal.title = 'Tambah Pengguna';
+                        if (type === 'bidang') this.formModal.title = 'Tambah Kategori Bidang';
+                    }
                     this.formModal.show = true;
+                },
+
+                async confirmDeleteBidang(bidang) {
+                    if (confirm(`Apakah Anda yakin ingin menghapus bidang "${bidang.nama}"? Data arsip dengan bidang ini tetap tersimpan tetapi kategorinya akan hilang.`)) {
+                        this.isLoading = true;
+                        if (typeof google !== 'undefined' && google.script && google.script.run) {
+                            google.script.run
+                                .withSuccessHandler((res) => {
+                                    this.isLoading = false;
+                                    if (res.success) {
+                                        this.showToast('Kategori bidang berhasil dihapus', 'success');
+                                        this.loadDashboard();
+                                    } else {
+                                        this.showError(res.message);
+                                    }
+                                })
+                                .withFailureHandler((err) => {
+                                    this.isLoading = false;
+                                    this.showError(err.message || 'Gagal menghapus bidang');
+                                })
+                                .deleteBidang(bidang.nama, this.user.username);
+                        } else {
+                            setTimeout(() => {
+                                this.isLoading = false;
+                                this.showToast('Simulasi: Bidang dihapus', 'success');
+                                this.loadDashboard();
+                            }, 1000);
+                        }
+                    }
                 },
 
                 handleFileChange(e) {
@@ -1056,10 +1141,17 @@
                                     .withFailureHandler((err) => { this.isLoading = false; this.showError(err.message || 'Gagal menambahkan user'); })
                                     .saveUser(this.formData, this.user.username);
                             } else if (type === 'bidang') {
-                                google.script.run
-                                    .withSuccessHandler((res) => { this.handleResponse(res, 'Kategori bidang berhasil ditambahkan'); })
-                                    .withFailureHandler((err) => { this.isLoading = false; this.showError(err.message || 'Gagal menambahkan bidang'); })
-                                    .saveBidang(this.formData, this.user.username);
+                                if (this.formModal.isEdit) {
+                                    google.script.run
+                                        .withSuccessHandler((res) => { this.handleResponse(res, 'Kategori bidang berhasil diperbarui'); })
+                                        .withFailureHandler((err) => { this.isLoading = false; this.showError(err.message || 'Gagal memperbarui bidang'); })
+                                        .updateBidang(this.formModal.oldNama, this.formData, this.user.username);
+                                } else {
+                                    google.script.run
+                                        .withSuccessHandler((res) => { this.handleResponse(res, 'Kategori bidang berhasil ditambahkan'); })
+                                        .withFailureHandler((err) => { this.isLoading = false; this.showError(err.message || 'Gagal menambahkan bidang'); })
+                                        .saveBidang(this.formData, this.user.username);
+                                }
                             }
                         } else {
                             // Mock (Local Development)
@@ -1125,10 +1217,9 @@
                             this.isLoading = false;
                             if (res.success) {
                                 this.user = res;
-                                if (this.rememberMe === 'yes') {
-                                    localStorage.setItem('sipatih_user', JSON.stringify(res));
-                                }
-                                this.loadDashboard(); // Ensure data is loaded
+                                localStorage.setItem('sipatih_user', JSON.stringify(res));
+                                localStorage.setItem('sipatih_last_activity', Date.now().toString());
+                                this.loadDashboard();
                                 this.navigate('dashboard');
                                 this.showToast('Selamat Datang, ' + res.username, 'success');
                             } else {
@@ -1142,9 +1233,8 @@
                             if ((this.username === 'admin' && this.password === 'admin') ||
                                 (this.username === 'user' && this.password === 'user')) {
                                 this.user = { success: true, role: this.username === 'admin' ? 'Admin' : 'Perangkat Desa', username: this.username };
-                                if (this.rememberMe === 'yes') {
-                                    localStorage.setItem('sipatih_user', JSON.stringify(this.user));
-                                }
+                                localStorage.setItem('sipatih_user', JSON.stringify(this.user));
+                                localStorage.setItem('sipatih_last_activity', Date.now().toString());
                                 this.navigate('dashboard');
                                 this.showToast('Login Berhasil (Mode Demo)', 'success');
                             } else {
@@ -1166,6 +1256,7 @@
                     this.username = '';
                     this.password = '';
                     localStorage.removeItem('sipatih_user');
+                    localStorage.removeItem('sipatih_last_activity');
                     this.navigate('login');
                     this.showToast('Sesi Anda telah berakhir', 'info');
                 },
