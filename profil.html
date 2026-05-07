@@ -1,0 +1,46 @@
+<div x-show="view === 'profil'" x-transition:enter="transition ease-out duration-300"
+    x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100">
+    <div
+        class="max-w-2xl mx-auto bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+        <div class="h-32 premium-gradient"></div>
+        <div class="px-8 pb-8 -mt-16">
+            <div class="flex flex-col items-center">
+                <div
+                    class="w-32 h-32 rounded-full border-4 border-white premium-gradient flex items-center justify-center text-white text-5xl font-bold shadow-xl">
+                    <span x-text="user?.username.charAt(0).toUpperCase()"></span>
+                </div>
+                <h3 class="mt-4 text-2xl font-bold text-gray-900 capitalize" x-text="user?.username">
+                </h3>
+                <p class="text-gray-500 font-medium" x-text="user?.role"></p>
+            </div>
+
+            <div class="mt-12 space-y-6">
+                <div class="p-6 bg-gray-50 rounded-2xl border border-gray-100">
+                    <h4 class="font-bold text-gray-900 mb-4">Ganti Password</h4>
+                    <div class="space-y-4">
+                        <div>
+                            <label
+                                class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Password
+                                Baru</label>
+                            <input type="password" x-model="profileData.newPassword"
+                                class="w-full p-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
+                        </div>
+                        <div>
+                            <label
+                                class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Konfirmasi
+                                Password Baru</label>
+                            <input type="password" x-model="profileData.confirmPassword"
+                                class="w-full p-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
+                        </div>
+                        <button @click="saveProfileUpdate" :disabled="isLoading"
+                            class="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-100 disabled:opacity-50">
+                            <span x-show="!isLoading">Simpan Perubahan</span>
+                            <span x-show="isLoading"><i
+                                    class="fas fa-circle-notch fa-spin mr-2"></i>Menyimpan...</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

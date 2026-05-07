@@ -1,0 +1,45 @@
+<div x-show="view === 'bidang_dokumen'" x-transition:enter="transition ease-out duration-300"
+    x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100">
+    <div class="mb-6 flex justify-between items-center">
+        <h3 class="text-xl font-bold text-gray-900">Manajemen Kategori Bidang</h3>
+        <button @click="openForm('bidang')"
+            class="px-5 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-emerald-200 btn-hover">
+            <i class="fas fa-plus mr-2"></i> Tambah Bidang
+        </button>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <template x-for="bidang in dashboardData?.bidangList" :key="bidang.kode">
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 card-hover cursor-pointer relative group/card"
+                @click="viewArsipBidang(bidang.nama)">
+                <div class="flex justify-between items-start mb-4">
+                    <div
+                        class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl">
+                        <i class="fas fa-folder"></i>
+                    </div>
+                    <div class="flex flex-col items-end gap-2">
+                        <span class="px-2.5 py-1 bg-gray-100 text-gray-600 text-xs font-semibold rounded-lg"
+                            x-text="'Kode: ' + bidang.kode"></span>
+                        <!-- Actions (Hidden by default, shown on hover or for admin) -->
+                        <div class="flex gap-1 opacity-0 group-hover/card:opacity-100 transition-opacity">
+                            <button @click.stop="openForm('bidang', bidang)"
+                                class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 flex items-center justify-center transition-colors">
+                                <i class="fas fa-edit text-xs"></i>
+                            </button>
+                            <button @click.stop="confirmDeleteBidang(bidang)"
+                                class="w-8 h-8 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center transition-colors">
+                                <i class="fas fa-trash text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <h3 class="text-lg font-bold text-gray-900 mb-1" x-text="bidang.nama"></h3>
+                <p class="text-sm text-gray-500 mb-4"><span x-text="bidang.jumlah"></span> Dokumen Arsip
+                </p>
+                <div class="flex items-center text-emerald-600 text-sm font-medium group">
+                    Lihat Dokumen <i
+                        class="fas fa-arrow-right ml-2 group-hover:translate-x-1 transition-transform"></i>
+                </div>
+            </div>
+        </template>
+    </div>
+</div>

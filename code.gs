@@ -4,10 +4,15 @@ const FOLDER_KELUAR_ID = '1P5i0zcrBWa97aAY5fkjMPsqRTpB_bZGX';
 const DRIVE_FOLDER_ID = '1GCrXpEb70cnsTvyTpnglyaSqyto0m_PC'; // Default fallback
 
 function doGet() {
-  return HtmlService.createHtmlOutputFromFile('index')
+  return HtmlService.createTemplateFromFile('index').evaluate()
       .setTitle('SIPATIH - Sistem Arsip Digital Desa Kepatihan')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename)
+      .getContent();
 }
 
 function getSS() {

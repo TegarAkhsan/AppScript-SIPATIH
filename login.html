@@ -1,0 +1,94 @@
+<div x-cloak x-show="view === 'login'"
+    class="min-h-screen flex items-center justify-center bg-gray-100 relative overflow-hidden">
+    <!-- Background decorative elements -->
+    <div
+        class="absolute top-[-10%] left-[-10%] w-96 h-96 bg-emerald-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30">
+    </div>
+    <div
+        class="absolute top-[20%] right-[-10%] w-96 h-96 bg-green-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30">
+    </div>
+    <div
+        class="absolute bottom-[-20%] left-[20%] w-96 h-96 bg-teal-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30">
+    </div>
+
+    <div class="glass-panel w-full max-w-md rounded-2xl p-8 relative z-10">
+        <div class="text-center mb-8">
+            <div class="w-20 h-20 bg-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+                <i class="fas fa-folder-open text-3xl text-white"></i>
+            </div>
+            <h1 class="text-3xl font-bold text-gray-900 tracking-tight">SIPATIH</h1>
+            <p class="text-gray-500 mt-2 text-sm">Sistem Arsip Digital Desa Kepatihan</p>
+        </div>
+
+        <!-- Login Error Alert -->
+        <div x-cloak x-show="loginError" class="mb-4 bg-red-50 border-l-4 border-red-500 p-4 rounded-r-md">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-exclamation-circle text-red-500"></i>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-red-700 font-medium" x-text="loginError"></p>
+                </div>
+            </div>
+        </div>
+
+        <form @submit.prevent="doLogin" class="space-y-6">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="fas fa-user text-gray-400"></i>
+                    </div>
+                    <input type="text" x-model="username" required
+                        class="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors shadow-sm"
+                        placeholder="Masukkan username">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="fas fa-lock text-gray-400"></i>
+                    </div>
+                    <input type="password" x-model="password" required
+                        class="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors shadow-sm"
+                        placeholder="Masukkan password">
+                </div>
+            </div>
+
+            <div class="flex flex-col space-y-2">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Remember me</label>
+                <div class="flex space-x-6">
+                    <label class="flex items-center cursor-pointer">
+                        <input type="radio" x-model="rememberMe" value="yes"
+                            class="w-4 h-4 text-emerald-600 border-gray-300 focus:ring-emerald-500">
+                        <span class="ml-2 text-sm text-gray-600">Ya</span>
+                    </label>
+                    <label class="flex items-center cursor-pointer">
+                        <input type="radio" x-model="rememberMe" value="no"
+                            class="w-4 h-4 text-emerald-600 border-gray-300 focus:ring-emerald-500">
+                        <span class="ml-2 text-sm text-gray-600">Tidak</span>
+                    </label>
+                </div>
+            </div>
+
+            <button type="submit" :disabled="isLoading"
+                class="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 btn-hover disabled:opacity-70">
+                <i x-show="isLoading" class="fas fa-circle-notch fa-spin mr-2"></i>
+                <span x-text="isLoading ? 'Memproses...' : 'Masuk Sistem'"></span>
+            </button>
+
+            <div class="mt-4 flex gap-2">
+                <button type="button" @click="autoLogin('admin')"
+                    class="flex-1 py-2 text-xs font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors border border-emerald-200">
+                    <i class="fas fa-magic mr-1"></i> Demo Admin
+                </button>
+                <button type="button" @click="autoLogin('user')"
+                    class="flex-1 py-2 text-xs font-medium text-green-600 bg-green-50 hover:bg-green-100 rounded-lg transition-colors border border-green-200">
+                    <i class="fas fa-magic mr-1"></i> Demo User
+                </button>
+            </div>
+        </form>
+    </div>
+</div>

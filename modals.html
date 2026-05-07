@@ -1,0 +1,266 @@
+<!-- Toast Notification -->
+<div x-cloak x-show="toast.show" x-transition:enter="transition ease-out duration-300"
+    x-transition:enter-start="opacity-0 translate-y-4 scale-95"
+    x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+    x-transition:leave="transition ease-in duration-200"
+    x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+    x-transition:leave-end="opacity-0 translate-y-4 scale-95"
+    class="fixed top-6 right-6 z-[100] rounded-2xl p-4 shadow-2xl flex items-center gap-4 text-white min-w-[300px]"
+    :class="toast.type === 'error' ? 'bg-red-600' : (toast.type === 'success' ? 'bg-emerald-600' : 'bg-emerald-600')">
+    <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+        <i class="fas"
+            :class="toast.type === 'error' ? 'fa-exclamation-triangle' : (toast.type === 'success' ? 'fa-check-circle' : 'fa-info-circle')"></i>
+    </div>
+    <div>
+        <p class="font-bold text-sm"
+            x-text="toast.type === 'error' ? 'Gagal!' : (toast.type === 'success' ? 'Berhasil!' : 'Informasi')"></p>
+        <p class="text-xs opacity-90" x-text="toast.message"></p>
+    </div>
+    <button @click="toast.show = false" class="ml-auto text-white/50 hover:text-white">
+        <i class="fas fa-times"></i>
+    </button>
+</div>
+
+<!-- Modal Preview Dokumen -->
+<div x-cloak x-show="preview.show" class="fixed inset-0 z-[60] flex items-center justify-center p-4 modal-overlay"
+    x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0"
+    x-transition:enter-end="opacity-100">
+    <div class="bg-white rounded-3xl w-full max-w-5xl h-[90vh] flex flex-col shadow-2xl overflow-hidden"
+        @click.away="preview.show = false" x-transition:enter="transition ease-out duration-300"
+        x-transition:enter-start="scale-95" x-transition:enter-end="scale-100">
+        <div class="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+            <div class="flex items-center gap-4">
+                <div class="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-md">
+                    <i class="fas fa-file-alt"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-gray-900" x-text="preview.title || 'Preview Dokumen'"></h3>
+                    <p class="text-xs text-gray-500" x-text="preview.url"></p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <a :href="preview.url" target="_blank"
+                    class="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-sm font-bold hover:bg-emerald-100 transition-colors">
+                    <i class="fas fa-external-link-alt mr-2"></i> Buka Penuh
+                </a>
+                <button @click="preview.show = false"
+                    class="w-10 h-10 rounded-xl bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+        <div class="flex-1 bg-gray-100 relative">
+            <template x-if="preview.url && preview.url.includes('drive.google.com')">
+                <iframe :src="preview.url.replace('/view', '/preview')"
+                    class="w-full h-full border-0 shadow-inner"></iframe>
+            </template>
+            <template x-if="preview.url && !preview.url.includes('drive.google.com')">
+                <iframe :src="preview.url" class="w-full h-full border-0 shadow-inner"></iframe>
+            </template>
+            <template x-if="!preview.url">
+                <div class="flex flex-col items-center justify-center h-full text-gray-400">
+                    <i class="fas fa-file-circle-xmark text-6xl mb-4 opacity-20"></i>
+                    <p>Link file tidak valid atau belum tersedia.</p>
+                </div>
+            </template>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Form (Arsip / User / Bidang) -->
+<div x-cloak x-show="formModal.show" class="fixed inset-0 z-[60] flex items-center justify-center p-4 modal-overlay"
+    x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0"
+    x-transition:enter-end="opacity-100">
+    <div class="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
+        x-transition:enter="transition ease-out duration-300" x-transition:enter-start="scale-95"
+        x-transition:enter-end="scale-100">
+        <div class="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+            <h3 class="font-bold text-xl text-gray-900" x-text="formModal.title"></h3>
+            <button @click="formModal.show = false"
+                class="w-10 h-10 rounded-xl bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="flex-1 overflow-y-auto p-8">
+            <form @submit.prevent="submitForm" id="mainForm" class="space-y-5">
+                <!-- Form Content is dynamically rendered based on type -->
+                <template x-if="formModal.type === 'naskah_masuk' || formModal.type === 'naskah_keluar'">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="col-span-1">
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">No.
+                                Agenda</label>
+                            <input type="text" x-model="formData.noAgenda" required
+                                class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
+                        </div>
+                        <div class="col-span-1">
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Kode
+                                Klasifikasi</label>
+                            <input type="text" x-model="formData.kodeKlasifikasi" required
+                                class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
+                        </div>
+                        <div class="col-span-2">
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Nomor
+                                Surat</label>
+                            <input type="text" x-model="formData.noSurat" required
+                                class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
+                        </div>
+                        <div class="col-span-1">
+                            <label
+                                class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Tanggal
+                                Surat</label>
+                            <input type="date" x-model="formData.tglSurat" required
+                                class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
+                        </div>
+                        <div class="col-span-1" x-show="formModal.type === 'naskah_masuk'">
+                            <label
+                                class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Tanggal
+                                Terima</label>
+                            <input type="date" x-model="formData.tglTerima"
+                                :required="formModal.type === 'naskah_masuk'"
+                                class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
+                        </div>
+                        <div class="col-span-2">
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2"
+                                x-text="formModal.type === 'naskah_masuk' ? 'Asal Instansi' : 'Tujuan Instansi'"></label>
+                            <input type="text" x-model="formData.instansi" required
+                                class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
+                        </div>
+                        <div class="col-span-2">
+                            <label
+                                class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Perihal</label>
+                            <input type="text" x-model="formData.perihal" required
+                                class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
+                        </div>
+                        <div class="col-span-1">
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Sifat
+                                Surat</label>
+                            <select x-model="formData.sifatSurat"
+                                class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
+                                <option value="Biasa">Biasa</option>
+                                <option value="Penting">Penting</option>
+                                <option value="Rahasia">Rahasia</option>
+                            </select>
+                        </div>
+                        <div class="col-span-1">
+                            <label
+                                class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Bidang</label>
+                            <select x-model="formData.bidang" required
+                                class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
+                                <option value="">Pilih Bidang</option>
+                                <template x-for="b in dashboardData?.bidangList" :key="b.nama">
+                                    <option :value="b.nama" x-text="b.nama"></option>
+                                </template>
+                            </select>
+                        </div>
+                        <div class="col-span-2">
+                            <label
+                                class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Unggah
+                                File Dokumen (Ke Google Drive)</label>
+                            <div class="relative group">
+                                <input type="file" @change="handleFileChange"
+                                    class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+                                <div
+                                    class="w-full p-4 border-2 border-dashed border-gray-200 rounded-2xl group-hover:border-emerald-400 transition-colors flex items-center gap-4 bg-gray-50">
+                                    <div
+                                        class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl">
+                                        <i class="fas"
+                                            :class="formData.fileName ? 'fa-file-check' : 'fa-cloud-upload'"></i>
+                                    </div>
+                                    <div class="text-left">
+                                        <p class="text-sm font-bold text-gray-900"
+                                            x-text="formData.fileName || 'Pilih atau Seret File'"></p>
+                                        <p class="text-xs text-gray-500">PDF, JPG, PNG, atau DOCX (Maks 10MB)</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-span-2">
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Atau
+                                Gunakan Link Drive Manual</label>
+                            <input type="url" x-model="formData.linkFile" placeholder="https://drive.google.com/..."
+                                class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
+                        </div>
+                        <div class="col-span-2">
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Keterangan Konfigurasi</label>
+                            <textarea x-model="formData.keterangan" placeholder="Masukkan keterangan (opsional)..." rows="3"
+                                class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none resize-none"></textarea>
+                        </div>
+                    </div>
+                </template>
+
+                <template x-if="formModal.type === 'pengguna'">
+                    <div class="space-y-4">
+                        <div>
+                            <label
+                                class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Username</label>
+                            <input type="text" x-model="formData.username" required
+                                class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
+                        </div>
+                        <div>
+                            <label
+                                class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Password</label>
+                            <input type="password" x-model="formData.password" required
+                                class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
+                        </div>
+                        <div>
+                            <label
+                                class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Role</label>
+                            <select x-model="formData.role" required
+                                class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
+                                <option value="Admin">Admin</option>
+                                <option value="Perangkat Desa">Perangkat Desa</option>
+                                <option value="Kepala Desa">Kepala Desa</option>
+                            </select>
+                        </div>
+                    </div>
+                </template>
+
+                <template x-if="formModal.type === 'bidang'">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Kode
+                                Bidang</label>
+                            <input type="text" x-model="formData.kode" required
+                                class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Nama
+                                Bidang</label>
+                            <input type="text" x-model="formData.nama" required
+                                class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
+                        </div>
+                    </div>
+                </template>
+            </form>
+        </div>
+        <div class="p-6 border-t border-gray-100 bg-gray-50/50 flex gap-3">
+            <button @click="formModal.show = false"
+                class="flex-1 py-3 bg-white border border-gray-200 text-gray-600 rounded-2xl font-bold hover:bg-gray-50 transition-colors">Batal</button>
+            <button type="submit" form="mainForm" :disabled="isLoading"
+                class="flex-1 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200 disabled:opacity-50">
+                <span x-show="!isLoading">Simpan Data</span>
+                <span x-show="isLoading"><i class="fas fa-circle-notch fa-spin mr-2"></i>Menyimpan...</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Notification Error -->
+<div x-cloak x-show="errorModal.show"
+    class="fixed inset-0 z-[100] flex items-center justify-center p-4 modal-overlay"
+    x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0"
+    x-transition:enter-end="opacity-100">
+    <div class="bg-white rounded-3xl w-full max-w-sm p-8 shadow-2xl flex flex-col items-center text-center"
+        x-transition:enter="transition ease-out duration-300" x-transition:enter-start="scale-95"
+        x-transition:enter-end="scale-100">
+        <div class="w-20 h-20 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-4xl mb-6">
+            <i class="fas fa-exclamation-triangle"></i>
+        </div>
+        <h3 class="text-xl font-bold text-gray-900 mb-2">Terjadi Kesalahan</h3>
+        <p class="text-gray-500 mb-8" x-text="errorModal.message"></p>
+        <button @click="errorModal.show = false"
+            class="w-full py-3 bg-red-600 text-white rounded-2xl font-bold hover:bg-red-700 transition-colors shadow-lg shadow-red-100">
+            Tutup Notifikasi
+        </button>
+    </div>
+</div>

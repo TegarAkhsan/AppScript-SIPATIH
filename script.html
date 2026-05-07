@@ -1,0 +1,409 @@
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('sipatihApp', () => ({
+            view: 'login',
+            user: null,
+
+            username: '',
+            password: '',
+            rememberMe: 'no',
+            loginError: '',
+            isLoading: false,
+
+            dashboardData: null,
+            arsipData: [],
+            usersData: [],
+            aktivitasData: [],
+
+            activeBidangFilter: '',
+
+            toast: { show: false, message: '', type: 'info' },
+            errorModal: { show: false, message: '' },
+            preview: { show: false, url: '', title: '' },
+            formModal: { show: false, type: '', title: '', isEdit: false, oldNama: '' },
+
+            formData: { fileName: '', fileData: '', sifatSurat: 'Biasa', keterangan: '' },
+            filterDownload: { startDate: '', endDate: '' },
+            profileData: { newPassword: '', confirmPassword: '' },
+
+            get filteredArsipData() {
+                let data = this.arsipData;
+                if (this.activeBidangFilter) {
+                    data = data.filter(a => a.bidang === this.activeBidangFilter);
+                }
+                return data;
+            },
+
+            init() {
+                this.checkSession();
+                // Jalankan pengecekan sesi setiap 1 menit
+                setInterval(() => this.checkSession(), 60000);
+                
+                // Pantau aktivitas user untuk memperbarui timestamp
+                ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'].forEach(name => {
+                    document.addEventListener(name, () => this.updateActivity());
+                });
+            },
+
+            updateActivity() {
+                if (this.user) {
+                    localStorage.setItem('sipatih_last_activity', Date.now().toString());
+                }
+            },
+
+            checkSession() {
+                const savedUser = localStorage.getItem('sipatih_user');
+                const lastActivity = localStorage.getItem('sipatih_last_activity');
+                const now = Date.now();
+                const timeout = 30 * 60 * 1000; // 30 menit
+
+                if (savedUser && lastActivity) {
+                    if (now - parseInt(lastActivity) > timeout) {
+                        this.user = null;
+                        localStorage.removeItem('sipatih_user');
+                        localStorage.removeItem('sipatih_last_activity');
+                        this.navigate('login');
+                        this.showError('Sesi Anda telah berakhir (30 menit tidak ada aktivitas). Silakan login kembali.');
+                    } else {
+                        this.user = JSON.parse(savedUser);
+                        if (this.view === 'login') {
+                            this.loadDashboard();
+                            this.navigate('dashboard');
+                        }
+                    }
+                } else if (this.view !== 'login' && !savedUser) {
+                    this.navigate('login');
+                }
+            },
+
+            showToast(message, type = 'info') {
+                this.toast.message = message;
+                this.toast.type = type;
+                this.toast.show = true;
+                // Reset show after animation
+                setTimeout(() => {
+                    this.toast.show = false;
+                }, 4000);
+            },
+
+            showError(message) {
+                this.errorModal.message = message;
+                this.errorModal.show = true;
+            },
+
+            openPreview(arsip) {
+                this.preview.url = arsip.linkFile;
+                this.preview.title = arsip.perihal;
+                this.preview.show = true;
+            },
+
+            openForm(type, item = null) {
+                this.formModal.type = type;
+                this.formModal.isEdit = !!item;
+                
+                if (item) {
+                    this.formData = { ...item };
+                    if (type === 'bidang') {
+                        this.formModal.oldNama = item.nama;
+                        this.formModal.title = 'Edit Kategori Bidang';
+                    }
+                } else {
+                    this.formData = { fileName: '', fileData: '', sifatSurat: 'Biasa', keterangan: '' };
+                    if (type === 'naskah_masuk') this.formModal.title = 'Input Naskah Masuk';
+                    if (type === 'naskah_keluar') this.formModal.title = 'Input Naskah Keluar';
+                    if (type === 'pengguna') this.formModal.title = 'Tambah Pengguna';
+                    if (type === 'bidang') this.formModal.title = 'Tambah Kategori Bidang';
+                }
+                this.formModal.show = true;
+            },
+
+            async confirmDeleteBidang(bidang) {
+                if (confirm(`Apakah Anda yakin ingin menghapus bidang "${bidang.nama}"? Data arsip dengan bidang ini tetap tersimpan tetapi kategorinya akan hilang.`)) {
+                    this.isLoading = true;
+                    if (typeof google !== 'undefined' && google.script && google.script.run) {
+                        google.script.run
+                            .withSuccessHandler((res) => {
+                                this.isLoading = false;
+                                if (res.success) {
+                                    this.showToast('Kategori bidang berhasil dihapus', 'success');
+                                    this.loadDashboard();
+                                } else {
+                                    this.showError(res.message);
+                                }
+                            })
+                            .withFailureHandler((err) => {
+                                this.isLoading = false;
+                                this.showError(err.message || 'Gagal menghapus bidang');
+                            })
+                            .deleteBidang(bidang.nama, this.user.username);
+                    } else {
+                        setTimeout(() => {
+                            this.isLoading = false;
+                            this.showToast('Simulasi: Bidang dihapus', 'success');
+                            this.loadDashboard();
+                        }, 1000);
+                    }
+                }
+            },
+
+            handleFileChange(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                if (file.size > 10 * 1024 * 1024) return this.showError('Ukuran file terlalu besar (Maks 10MB)');
+
+                const reader = new FileReader();
+                reader.onload = (f) => {
+                    this.formData.fileData = f.target.result;
+                    this.formData.fileName = file.name;
+                };
+                reader.readAsDataURL(file);
+            },
+
+            async submitForm() {
+                this.isLoading = true;
+                const type = this.formModal.type;
+
+                try {
+                    if (typeof google !== 'undefined' && google.script && google.script.run) {
+                        if (type === 'naskah_masuk' || type === 'naskah_keluar') {
+                            const subType = type === 'naskah_masuk' ? 'Masuk' : 'Keluar';
+
+                            if (this.formData.fileData) {
+                                this.showToast('Memproses dan mengunggah file...', 'info');
+                            }
+
+                            google.script.run
+                                .withSuccessHandler((res) => {
+                                    this.handleResponse(res, 'Data naskah berhasil disimpan');
+                                })
+                                .withFailureHandler((err) => {
+                                    // Script-level failure (timeout/crash) — data may already be saved
+                                    this.isLoading = false;
+                                    this.formModal.show = false;
+                                    this.showToast('Data tersimpan. Catatan: ' + (err.message || 'Periksa kembali data Anda.'), 'info');
+                                    setTimeout(() => this.navigate(this.view), 500);
+                                })
+                                .saveArsipWithFile(
+                                    subType,
+                                    this.formData,
+                                    this.user.username,
+                                    this.formData.fileData || null,
+                                    this.formData.fileName || null
+                                );
+
+                        } else if (type === 'pengguna') {
+                            google.script.run
+                                .withSuccessHandler((res) => { this.handleResponse(res, 'User baru berhasil ditambahkan'); })
+                                .withFailureHandler((err) => { this.isLoading = false; this.showError(err.message || 'Gagal menambahkan user'); })
+                                .saveUser(this.formData, this.user.username);
+                        } else if (type === 'bidang') {
+                            if (this.formModal.isEdit) {
+                                google.script.run
+                                    .withSuccessHandler((res) => { this.handleResponse(res, 'Kategori bidang berhasil diperbarui'); })
+                                    .withFailureHandler((err) => { this.isLoading = false; this.showError(err.message || 'Gagal memperbarui bidang'); })
+                                    .updateBidang(this.formModal.oldNama, this.formData, this.user.username);
+                            } else {
+                                google.script.run
+                                    .withSuccessHandler((res) => { this.handleResponse(res, 'Kategori bidang berhasil ditambahkan'); })
+                                    .withFailureHandler((err) => { this.isLoading = false; this.showError(err.message || 'Gagal menambahkan bidang'); })
+                                    .saveBidang(this.formData, this.user.username);
+                            }
+                        }
+                    } else {
+                        // Mock (Local Development)
+                        setTimeout(() => {
+                            this.isLoading = false;
+                            this.formModal.show = false;
+                            this.showToast('Simulasi: Data berhasil disimpan', 'success');
+                            this.navigate(this.view);
+                        }, 1000);
+                    }
+                } catch (e) {
+                    this.isLoading = false;
+                    this.showError(e.message);
+                }
+            },
+
+            handleResponse(res, successMsg) {
+                this.isLoading = false;
+                if (res && res.success) {
+                    this.formModal.show = false;
+                    // If there's a warning (e.g. file upload failed but data saved), show warning toast
+                    if (res.warning) {
+                        this.showToast('Data tersimpan. Catatan: ' + res.warning, 'info');
+                    } else {
+                        this.showToast(successMsg, 'success');
+                    }
+                    setTimeout(() => this.navigate(this.view), 300);
+                } else {
+                    this.showError((res && res.message) ? res.message : 'Terjadi kesalahan sistem');
+                }
+            },
+
+            async saveProfileUpdate() {
+                if (!this.profileData.newPassword) return this.showToast('Password tidak boleh kosong', 'error');
+                if (this.profileData.newPassword !== this.profileData.confirmPassword) return this.showToast('Konfirmasi password tidak cocok', 'error');
+
+                this.isLoading = true;
+                if (typeof google !== 'undefined' && google.script && google.script.run) {
+                    google.script.run.withSuccessHandler((res) => {
+                        this.isLoading = false;
+                        if (res.success) {
+                            this.showToast('Profil berhasil diperbarui', 'success');
+                            this.profileData = { newPassword: '', confirmPassword: '' };
+                        } else {
+                            this.showToast(res.message, 'error');
+                        }
+                    }).updateProfile(this.profileData.newPassword, this.user.username);
+                } else {
+                    setTimeout(() => {
+                        this.isLoading = false;
+                        this.showToast('Simulasi: Profil berhasil diperbarui', 'success');
+                        this.profileData = { newPassword: '', confirmPassword: '' };
+                    }, 1000);
+                }
+            },
+
+            doLogin() {
+                this.isLoading = true;
+                this.loginError = '';
+
+                if (typeof google !== 'undefined' && google.script && google.script.run) {
+                    google.script.run.withSuccessHandler((res) => {
+                        this.isLoading = false;
+                        if (res.success) {
+                            this.user = res;
+                            localStorage.setItem('sipatih_user', JSON.stringify(res));
+                            localStorage.setItem('sipatih_last_activity', Date.now().toString());
+                            this.loadDashboard();
+                            this.navigate('dashboard');
+                            this.showToast('Selamat Datang, ' + res.username, 'success');
+                        } else {
+                            this.loginError = res.message;
+                        }
+                    }).login(this.username, this.password);
+                } else {
+                    // Mock for local preview
+                    setTimeout(() => {
+                        this.isLoading = false;
+                        if ((this.username === 'admin' && this.password === 'admin') ||
+                            (this.username === 'user' && this.password === 'user')) {
+                            this.user = { success: true, role: this.username === 'admin' ? 'Admin' : 'Perangkat Desa', username: this.username };
+                            localStorage.setItem('sipatih_user', JSON.stringify(this.user));
+                            localStorage.setItem('sipatih_last_activity', Date.now().toString());
+                            this.navigate('dashboard');
+                            this.showToast('Login Berhasil (Mode Demo)', 'success');
+                        } else {
+                            this.loginError = 'Username atau password salah! (Gunakan admin/admin)';
+                        }
+                    }, 800);
+                }
+            },
+
+            autoLogin(role) {
+                this.username = role;
+                this.password = role;
+                this.rememberMe = 'no';
+                this.doLogin();
+            },
+
+            doLogout() {
+                this.user = null;
+                this.username = '';
+                this.password = '';
+                localStorage.removeItem('sipatih_user');
+                localStorage.removeItem('sipatih_last_activity');
+                this.navigate('login');
+                this.showToast('Sesi Anda telah berakhir', 'info');
+            },
+
+            navigate(page) {
+                this.view = page;
+                this.activeBidangFilter = '';
+
+                // Always ensure dashboard data is available for bidang lists
+                if (!this.dashboardData) this.loadDashboard();
+
+                if (page === 'dashboard') this.loadDashboard();
+                if (page === 'naskah_masuk' || page === 'naskah_keluar') this.loadArsip();
+                if (page === 'pengguna') this.loadPengguna();
+                if (page === 'tracking') this.loadTracking();
+                if (page === 'bidang_dokumen') this.loadDashboard();
+            },
+
+            viewArsipBidang(bidangName) {
+                this.activeBidangFilter = bidangName;
+                this.navigate('naskah_masuk'); // Default to masuk
+            },
+
+            loadDashboard() {
+                if (typeof google !== 'undefined' && google.script && google.script.run) {
+                    google.script.run.withSuccessHandler(data => this.dashboardData = data).getDashboardData();
+                } else {
+                    this.dashboardData = {
+                        totalArsip: 550, totalBidang: 4, arsipAktif: 400, arsipInaktif: 150, bidangList: [
+                            { kode: '470', nama: 'Kependudukan', jumlah: 120 }, { kode: '590', nama: 'Pertanahan', jumlah: 45 },
+                            { kode: '000', nama: 'Umum', jumlah: 300 }, { kode: '100', nama: 'Pemerintahan', jumlah: 85 }
+                        ]
+                    };
+                }
+            },
+
+            loadArsip() {
+                if (typeof google !== 'undefined' && google.script && google.script.run) {
+                    google.script.run.withSuccessHandler(data => this.arsipData = data).getArsipData();
+                } else {
+                    this.arsipData = [
+                        { jenis: 'Masuk', noIndeks: '001', noSurat: '470/01/DS/2023', perihal: 'Permohonan Akte Lahir', bidang: 'Kependudukan', tglSurat: '01-10-2023', sifatSurat: 'Biasa', asalInstansi: 'Warga' },
+                        { jenis: 'Keluar', noIndeks: '002', noSurat: '590/12/DS/2023', perihal: 'Sertifikat Tanah Desa', bidang: 'Pertanahan', tglSurat: '05-10-2023', sifatSurat: 'Penting', tujuanInstansi: 'BPN' }
+                    ];
+                }
+            },
+
+            loadPengguna() {
+                if (typeof google !== 'undefined' && google.script && google.script.run) {
+                    google.script.run.withSuccessHandler(data => this.usersData = data).getUsers();
+                } else {
+                    this.usersData = [
+                        { id: 1, username: 'admin', role: 'Admin', status: 'Aktif' },
+                        { id: 2, username: 'user', role: 'Perangkat Desa', status: 'Aktif' }
+                    ];
+                }
+            },
+
+            loadTracking() {
+                if (typeof google !== 'undefined' && google.script && google.script.run) {
+                    google.script.run.withSuccessHandler(data => this.aktivitasData = data).getAktivitas();
+                } else {
+                    this.aktivitasData = [
+                        { username: 'admin', timestamp: '2023-10-27 10:00:00', aktivitas: 'Login', detail: 'Berhasil login ke sistem' }
+                    ];
+                }
+            },
+
+            downloadExcel() {
+                this.showToast('Menyiapkan file Excel...', 'info');
+                if (typeof google !== 'undefined' && google.script && google.script.run) {
+                    google.script.run.withSuccessHandler(url => {
+                        window.open(url, '_blank');
+                        this.showToast('Download dimulai', 'success');
+                    }).downloadDataArsip(this.user?.username || 'admin', this.filterDownload.startDate, this.filterDownload.endDate);
+                } else {
+                    setTimeout(() => this.showToast('Simulasi: Excel berhasil didownload', 'success'), 1000);
+                }
+            },
+
+            downloadZip() {
+                this.showToast('Menyiapkan paket ZIP...', 'info');
+                if (typeof google !== 'undefined' && google.script && google.script.run) {
+                    google.script.run.withSuccessHandler(url => {
+                        window.open(url, '_blank');
+                        this.showToast('Download ZIP dimulai', 'success');
+                    }).downloadDataZip(this.user?.username || 'admin', this.filterDownload.startDate, this.filterDownload.endDate);
+                } else {
+                    setTimeout(() => this.showToast('Simulasi: ZIP berhasil didownload', 'success'), 1500);
+                }
+            }
+        }));
+    });
+</script>

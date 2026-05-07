@@ -1,0 +1,50 @@
+<div x-show="view === 'pengguna'" x-transition:enter="transition ease-out duration-300"
+    x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100">
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div class="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+            <h3 class="text-lg font-bold text-gray-800">Manajemen Hak Akses Pengguna</h3>
+            <button @click="openForm('pengguna')"
+                class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium btn-hover">
+                <i class="fas fa-plus mr-2"></i> Tambah User
+            </button>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
+                        <th class="px-6 py-4 font-semibold border-b">ID</th>
+                        <th class="px-6 py-4 font-semibold border-b">Username</th>
+                        <th class="px-6 py-4 font-semibold border-b">Role</th>
+                        <th class="px-6 py-4 font-semibold border-b">Status</th>
+                        <th class="px-6 py-4 font-semibold border-b">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    <template x-for="u in usersData" :key="u.id">
+                        <tr class="hover:bg-gray-50 transition-colors">
+                            <td class="px-6 py-4 text-sm text-gray-500" x-text="u.id"></td>
+                            <td class="px-6 py-4 text-sm text-gray-900 font-medium capitalize"
+                                x-text="u.username"></td>
+                            <td class="px-6 py-4 text-sm text-gray-600">
+                                <span
+                                    class="px-2.5 py-1 bg-green-50 text-green-700 text-xs rounded-lg font-medium"
+                                    x-text="u.role"></span>
+                            </td>
+                            <td class="px-6 py-4">
+                                <span
+                                    class="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs rounded-lg font-medium"
+                                    x-text="u.status || 'Aktif'"></span>
+                            </td>
+                            <td class="px-6 py-4 text-sm">
+                                <button class="text-emerald-600 hover:text-emerald-800 p-1"><i
+                                        class="fas fa-edit"></i></button>
+                                <button class="text-red-600 hover:text-red-800 p-1 ml-2"><i
+                                        class="fas fa-trash"></i></button>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
