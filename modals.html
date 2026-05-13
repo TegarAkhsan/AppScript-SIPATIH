@@ -147,8 +147,15 @@
                             <select x-model="formData.bidang" required
                                 class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
                                 <option value="">Pilih Bidang</option>
-                                <template x-for="b in dashboardData?.bidangList" :key="b.nama">
-                                    <option :value="b.nama" x-text="b.nama"></option>
+                                <template x-if="formModal.type === 'naskah_masuk'">
+                                    <template x-for="opt in ['Pemerintahan', 'Kesejahteraan', 'Kependudukan', 'Umum']" :key="opt">
+                                        <option :value="opt" x-text="opt"></option>
+                                    </template>
+                                </template>
+                                <template x-if="formModal.type !== 'naskah_masuk'">
+                                    <template x-for="b in dashboardData?.bidangList" :key="b.nama">
+                                        <option :value="b.nama" x-text="b.nama"></option>
+                                    </template>
                                 </template>
                             </select>
                         </div>

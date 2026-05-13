@@ -91,13 +91,11 @@ function setupHeaders() {
     }
     if(sh.getLastRow() === 1) {
       const klasifikasiAwal = [
-        ['2', '470.1', 'Kependudukan', 'Kelahiran / Akte Lahir', '', ''],
-        ['3', '470.2', 'Kependudukan', 'Kematian / Akte Kematian', '', ''],
-        ['4', '470.3', 'Kependudukan', 'Perkawinan / Akte Nikah', '', ''],
-        ['5', '470.4', 'Kependudukan', 'Perceraian', '', ''],
-        ['6', '470.5', 'Kependudukan', 'KTP / KK / Domisili', '', ''],
-        ['7', '590.1', 'Pertanahan', 'Setifikat / Kepemilikan', '', ''],
-        ['8', '590.2', 'Pertanahan', 'Hibah / Waris Tanah', '', '']
+        ['2', '01', 'Pertanahan', '-', '', ''],
+        ['3', '02', 'Pelayanan Umum', '-', '', ''],
+        ['4', '03', 'Pelayanan Administrasi Kependudukan', '-', '', ''],
+        ['5', '04', 'Pelayanan Nikah', '-', '', ''],
+        ['6', '05', 'Agenda', '-', '', '']
       ];
       klasifikasiAwal.forEach(row => sh.appendRow(row));
     }

@@ -341,9 +341,12 @@
                     google.script.run.withSuccessHandler(data => this.dashboardData = data).getDashboardData();
                 } else {
                     this.dashboardData = {
-                        totalArsip: 550, totalBidang: 4, arsipAktif: 400, arsipInaktif: 150, bidangList: [
-                            { kode: '470', nama: 'Kependudukan', jumlah: 120 }, { kode: '590', nama: 'Pertanahan', jumlah: 45 },
-                            { kode: '000', nama: 'Umum', jumlah: 300 }, { kode: '100', nama: 'Pemerintahan', jumlah: 85 }
+                        totalArsip: 550, totalBidang: 5, arsipAktif: 400, arsipInaktif: 150, bidangList: [
+                            { kode: '01', nama: 'Pertanahan', jumlah: 45 },
+                            { kode: '02', nama: 'Pelayanan Umum', jumlah: 300 },
+                            { kode: '03', nama: 'Pelayanan Administrasi Kependudukan', jumlah: 120 },
+                            { kode: '04', nama: 'Pelayanan Nikah', jumlah: 85 },
+                            { kode: '05', nama: 'Agenda', jumlah: 10 }
                         ]
                     };
                 }
