@@ -4,6 +4,7 @@ const FOLDER_KELUAR_ID = '1P5i0zcrBWa97aAY5fkjMPsqRTpB_bZGX';
 const DRIVE_FOLDER_ID = '1GCrXpEb70cnsTvyTpnglyaSqyto0m_PC'; // Default fallback
 
 function doGet() {
+  checkAndInitializeBidang();
   return HtmlService.createTemplateFromFile('index').evaluate()
       .setTitle('SIPATIH - Sistem Arsip Digital Desa Kepatihan')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
@@ -91,11 +92,10 @@ function setupHeaders() {
     }
     if(sh.getLastRow() === 1) {
       const klasifikasiAwal = [
-        ['2', '01', 'Pertanahan', '-', '', ''],
-        ['3', '02', 'Pelayanan Umum', '-', '', ''],
-        ['4', '03', 'Pelayanan Administrasi Kependudukan', '-', '', ''],
-        ['5', '04', 'Pelayanan Nikah', '-', '', ''],
-        ['6', '05', 'Agenda', '-', '', '']
+        ['2', 'PEM', 'Pemerintahan', '-', '', ''],
+        ['3', 'KES', 'Kesejahteraan', '-', '', ''],
+        ['4', 'KEP', 'Kependudukan', '-', '', ''],
+        ['5', 'UMU', 'Umum', '-', '', '']
       ];
       klasifikasiAwal.forEach(row => sh.appendRow(row));
     }
@@ -161,6 +161,7 @@ function logActivity(username, aktivitas, detail) {
 // ----------------------------------------------------
 function getDashboardData() {
   try {
+    checkAndInitializeBidang();
     setupHeaders(); // Pastikan header dan data awal tersedia
     const ss = getSS();
     const arsipMasukSheet = ss.getSheetByName('Naskah Masuk');
@@ -177,13 +178,18 @@ function getDashboardData() {
     const totalArsip = masukCount + keluarCount;
 
     let bidangMap = {};
+    let bidangCodes = {};
     if (klasifikasiSheet && klasifikasiSheet.getLastRow() > 1) {
-      const klasData = klasifikasiSheet.getRange(2, 3, klasifikasiSheet.getLastRow() - 1, 1).getValues(); 
+      const klasData = klasifikasiSheet.getRange(2, 2, klasifikasiSheet.getLastRow() - 1, 2).getValues(); 
       klasData.forEach(row => {
-        let b = row[0];
+        let code = row[0];
+        let b = row[1];
         if(b) {
           b = b.toString().trim();
-          if(b !== "") bidangMap[b] = 0;
+          if(b !== "") {
+            bidangMap[b] = 0;
+            bidangCodes[b] = code ? code.toString().trim().toUpperCase() : b.substring(0, 3).toUpperCase();
+          }
         }
       });
     }
@@ -205,7 +211,7 @@ function getDashboardData() {
     }
 
     const bidangList = Object.keys(bidangMap).map(k => ({
-      kode: k.substring(0, 3).toUpperCase(), 
+      kode: bidangCodes[k] || k.substring(0, 3).toUpperCase(), 
       nama: k,
       jumlah: bidangMap[k]
     }));
@@ -493,5 +499,49 @@ function updateBidang(oldNama, newData, username) {
     return { success: false, message: 'Bidang tidak ditemukan' };
   } catch (e) {
     return { success: false, message: e.message };
+  }
+}
+
+// Helper to initialize custom/required bidang list directly
+function initializeBidangBaru() {
+  try {
+    const ss = getSS();
+    let sh = ss.getSheetByName('Klasifikasi Arsip');
+    if (!sh) {
+      sh = ss.insertSheet('Klasifikasi Arsip');
+    }
+    
+    // Clear and reset the classification sheet to exactly these 4
+    sh.clear();
+    sh.appendRow(['Baris', 'Kode', 'Nama Bidang', 'Jenis Arsip', 'Retensi Aktif', 'Retensi Inaktif']);
+    
+    const klasifikasiAwal = [
+      ['2', 'PEM', 'Pemerintahan', '-', '', ''],
+      ['3', 'KES', 'Kesejahteraan', '-', '', ''],
+      ['4', 'KEP', 'Kependudukan', '-', '', ''],
+      ['5', 'UMU', 'Umum', '-', '', '']
+    ];
+    klasifikasiAwal.forEach(row => sh.appendRow(row));
+    
+    logActivity('Sistem', 'Reset Bidang', 'Inisialisasi bidang dokumen: Pemerintahan, Kesejahteraan, Kependudukan, Umum');
+    return true;
+  } catch (e) {
+    console.error('Gagal inisialisasi bidang baru: ' + e.message);
+    return false;
+  }
+}
+
+function checkAndInitializeBidang() {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const initialized = props.getProperty('bidang_initialized_v3');
+    if (initialized !== 'true') {
+      const success = initializeBidangBaru();
+      if (success) {
+        props.setProperty('bidang_initialized_v3', 'true');
+      }
+    }
+  } catch (e) {
+    console.error('Error di checkAndInitializeBidang: ' + e.message);
   }
 }

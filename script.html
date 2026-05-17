@@ -341,12 +341,11 @@
                     google.script.run.withSuccessHandler(data => this.dashboardData = data).getDashboardData();
                 } else {
                     this.dashboardData = {
-                        totalArsip: 550, totalBidang: 5, arsipAktif: 400, arsipInaktif: 150, bidangList: [
-                            { kode: '01', nama: 'Pertanahan', jumlah: 45 },
-                            { kode: '02', nama: 'Pelayanan Umum', jumlah: 300 },
-                            { kode: '03', nama: 'Pelayanan Administrasi Kependudukan', jumlah: 120 },
-                            { kode: '04', nama: 'Pelayanan Nikah', jumlah: 85 },
-                            { kode: '05', nama: 'Agenda', jumlah: 10 }
+                        totalArsip: 550, totalBidang: 4, arsipAktif: 400, arsipInaktif: 150, bidangList: [
+                            { kode: 'PEM', nama: 'Pemerintahan', jumlah: 120 },
+                            { kode: 'KES', nama: 'Kesejahteraan', jumlah: 85 },
+                            { kode: 'KEP', nama: 'Kependudukan', jumlah: 300 },
+                            { kode: 'UMU', nama: 'Umum', jumlah: 45 }
                         ]
                     };
                 }
@@ -358,7 +357,7 @@
                 } else {
                     this.arsipData = [
                         { jenis: 'Masuk', noIndeks: '001', noSurat: '470/01/DS/2023', perihal: 'Permohonan Akte Lahir', bidang: 'Kependudukan', tglSurat: '01-10-2023', sifatSurat: 'Biasa', asalInstansi: 'Warga' },
-                        { jenis: 'Keluar', noIndeks: '002', noSurat: '590/12/DS/2023', perihal: 'Sertifikat Tanah Desa', bidang: 'Pertanahan', tglSurat: '05-10-2023', sifatSurat: 'Penting', tujuanInstansi: 'BPN' }
+                        { jenis: 'Keluar', noIndeks: '002', noSurat: '590/12/DS/2023', perihal: 'Sertifikat Tanah Desa', bidang: 'Umum', tglSurat: '05-10-2023', sifatSurat: 'Penting', tujuanInstansi: 'BPN' }
                     ];
                 }
             },
