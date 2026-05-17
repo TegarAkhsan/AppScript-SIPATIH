@@ -22,7 +22,17 @@
             preview: { show: false, url: '', title: '' },
             formModal: { show: false, type: '', title: '', isEdit: false, oldNama: '' },
 
-            formData: { fileName: '', fileData: '', sifatSurat: 'Biasa', keterangan: '' },
+            formData: { 
+                fileName: '', 
+                fileData: '', 
+                sifatSurat: 'Biasa', 
+                keterangan: '',
+                jenisSurat: '',
+                noSurat: '',
+                tglSurat: '',
+                keperluan: '',
+                tandaTangan: ''
+            },
             filterDownload: { startDate: '', endDate: '' },
             profileData: { newPassword: '', confirmPassword: '' },
 
@@ -94,6 +104,7 @@
             openPreview(arsip) {
                 this.preview.url = arsip.linkFile;
                 this.preview.title = arsip.perihal;
+                this.preview.item = arsip;
                 this.preview.show = true;
             },
 
@@ -108,7 +119,17 @@
                         this.formModal.title = 'Edit Kategori Bidang';
                     }
                 } else {
-                    this.formData = { fileName: '', fileData: '', sifatSurat: 'Biasa', keterangan: '' };
+                    this.formData = { 
+                        fileName: '', 
+                        fileData: '', 
+                        sifatSurat: 'Biasa', 
+                        keterangan: '',
+                        jenisSurat: '',
+                        noSurat: '',
+                        tglSurat: '',
+                        keperluan: '',
+                        tandaTangan: ''
+                    };
                     if (type === 'naskah_masuk') this.formModal.title = 'Input Naskah Masuk';
                     if (type === 'naskah_keluar') this.formModal.title = 'Input Naskah Keluar';
                     if (type === 'pengguna') this.formModal.title = 'Tambah Pengguna';

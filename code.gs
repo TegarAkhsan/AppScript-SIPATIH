@@ -75,13 +75,35 @@ function setupHeaders() {
   // Naskah Masuk
   sh = getOrCreateSheet('Naskah Masuk');
   if(sh.getLastRow() === 0) {
-    sh.appendRow(['Nomor Indeks', 'Nomor Agenda', 'Kode Klasifikasi', 'Nomor Surat', 'Tanggal Surat', 'Tanggal Terima', 'Asal Instansi', 'Perihal', 'Sifat Surat', 'Bidang', 'Disposisi', 'Status Arsip', 'Keterangan', 'Diinput Oleh', 'Link File']);
+    sh.appendRow(['Nomor Indeks', 'Nomor Agenda', 'Kode Klasifikasi', 'Nomor Surat', 'Tanggal Surat', 'Tanggal Terima', 'Asal Instansi', 'Perihal', 'Sifat Surat', 'Bidang', 'Disposisi', 'Status Arsip', 'Keterangan', 'Diinput Oleh', 'Link File', 'Jenis Surat', 'Keperluan', 'Tanda Tangan']);
+  } else {
+    // Check if headers have the new fields, if not append them to row 1
+    const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+    const missing = [];
+    if (!headers.includes('Jenis Surat')) missing.push('Jenis Surat');
+    if (!headers.includes('Keperluan')) missing.push('Keperluan');
+    if (!headers.includes('Tanda Tangan')) missing.push('Tanda Tangan');
+    if (missing.length > 0) {
+      const startCol = sh.getLastColumn() + 1;
+      sh.getRange(1, startCol, 1, missing.length).setValues([missing]);
+    }
   }
 
   // Naskah Keluar
   sh = getOrCreateSheet('Naskah Keluar');
   if(sh.getLastRow() === 0) {
-    sh.appendRow(['Nomor Indeks', 'Nomor Agenda', 'Kode Klasifikasi', 'Nomor Surat', 'Tanggal Surat', 'Tujuan Instansi', 'Perihal', 'Sifat Surat', 'Bidang', 'Status Arsip', 'Keterangan', 'Diinput Oleh', 'Link File']);
+    sh.appendRow(['Nomor Indeks', 'Nomor Agenda', 'Kode Klasifikasi', 'Nomor Surat', 'Tanggal Surat', 'Tujuan Instansi', 'Perihal', 'Sifat Surat', 'Bidang', 'Status Arsip', 'Keterangan', 'Diinput Oleh', 'Link File', 'Jenis Surat', 'Keperluan', 'Tanda Tangan']);
+  } else {
+    // Check if headers have the new fields, if not append them to row 1
+    const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+    const missing = [];
+    if (!headers.includes('Jenis Surat')) missing.push('Jenis Surat');
+    if (!headers.includes('Keperluan')) missing.push('Keperluan');
+    if (!headers.includes('Tanda Tangan')) missing.push('Tanda Tangan');
+    if (missing.length > 0) {
+      const startCol = sh.getLastColumn() + 1;
+      sh.getRange(1, startCol, 1, missing.length).setValues([missing]);
+    }
   }
 
   // Klasifikasi Arsip (Sesuai Permintaan User)
@@ -235,40 +257,58 @@ function getArsipData() {
     
     const masukSheet = ss.getSheetByName('Naskah Masuk');
     if (masukSheet && masukSheet.getLastRow() > 1) {
-      const mData = masukSheet.getRange(2, 1, masukSheet.getLastRow() - 1, 15).getValues();
+      const lastCol = Math.max(masukSheet.getLastColumn(), 18);
+      const mData = masukSheet.getRange(2, 1, masukSheet.getLastRow() - 1, lastCol).getValues();
       mData.forEach(row => {
         if(!row[0] && !row[3]) return;
         result.push({
           jenis: 'Masuk',
           noIndeks: row[0],
+          noAgenda: row[1],
+          kodeKlasifikasi: row[2],
           noSurat: row[3],
           tglSurat: row[4] instanceof Date ? Utilities.formatDate(row[4], 'Asia/Jakarta', 'dd-MM-yyyy') : (row[4] || '-'),
+          tglTerima: row[5] instanceof Date ? Utilities.formatDate(row[5], 'Asia/Jakarta', 'dd-MM-yyyy') : (row[5] || '-'),
+          asalInstansi: row[6],
+          instansi: row[6],
           perihal: row[7],
           sifatSurat: row[8],
           bidang: row[9],
-          asalInstansi: row[6],
+          disposisi: row[10],
+          statusArsip: row[11],
           keterangan: row[12],
-          linkFile: row[14]
+          linkFile: row[14],
+          jenisSurat: row[15] || '-',
+          keperluan: row[16] || '-',
+          tandaTangan: row[17] || '-'
         });
       });
     }
 
     const keluarSheet = ss.getSheetByName('Naskah Keluar');
     if (keluarSheet && keluarSheet.getLastRow() > 1) {
-      const kData = keluarSheet.getRange(2, 1, keluarSheet.getLastRow() - 1, 13).getValues();
+      const lastCol = Math.max(keluarSheet.getLastColumn(), 16);
+      const kData = keluarSheet.getRange(2, 1, keluarSheet.getLastRow() - 1, lastCol).getValues();
       kData.forEach(row => {
         if(!row[0] && !row[3]) return;
         result.push({
           jenis: 'Keluar',
           noIndeks: row[0],
+          noAgenda: row[1],
+          kodeKlasifikasi: row[2],
           noSurat: row[3],
           tglSurat: row[4] instanceof Date ? Utilities.formatDate(row[4], 'Asia/Jakarta', 'dd-MM-yyyy') : (row[4] || '-'),
+          tujuanInstansi: row[5],
+          instansi: row[5],
           perihal: row[6],
           sifatSurat: row[7],
           bidang: row[8],
-          tujuanInstansi: row[5],
+          statusArsip: row[9],
           keterangan: row[10],
-          linkFile: row[12]
+          linkFile: row[12],
+          jenisSurat: row[13] || '-',
+          keperluan: row[14] || '-',
+          tandaTangan: row[15] || '-'
         });
       });
     }
@@ -337,8 +377,8 @@ function saveArsip(type, data, username) {
     if (!sheet) return { success: false, message: 'Sheet ' + sheetName + ' tidak ditemukan.' };
 
     const row = type === 'Masuk' ? 
-      [data.noIndeks, data.noAgenda, data.kodeKlasifikasi, data.noSurat, data.tglSurat, data.tglTerima, data.asalInstansi, data.perihal, data.sifatSurat, data.bidang, data.disposisi, data.statusArsip, data.keterangan, username, data.linkFile] :
-      [data.noIndeks, data.noAgenda, data.kodeKlasifikasi, data.noSurat, data.tglSurat, data.tujuanInstansi, data.perihal, data.sifatSurat, data.bidang, data.statusArsip, data.keterangan, username, data.linkFile];
+      [data.noIndeks, data.noAgenda, data.kodeKlasifikasi, data.noSurat, data.tglSurat, data.tglTerima, data.asalInstansi, data.perihal, data.sifatSurat, data.bidang, data.disposisi, data.statusArsip, data.keterangan, username, data.linkFile, data.jenisSurat || '-', data.keperluan || '-', data.tandaTangan || '-'] :
+      [data.noIndeks, data.noAgenda, data.kodeKlasifikasi, data.noSurat, data.tglSurat, data.tujuanInstansi, data.perihal, data.sifatSurat, data.bidang, data.statusArsip, data.keterangan, username, data.linkFile, data.jenisSurat || '-', data.keperluan || '-', data.tandaTangan || '-'];
 
     sheet.appendRow(row);
     logActivity(username, 'Simpan Naskah ' + type, 'Berhasil menyimpan naskah: ' + data.noSurat);
@@ -396,8 +436,8 @@ function saveArsipWithFile(type, data, username, base64Data, fileName) {
     if (!sheet) return { success: false, message: 'Sheet ' + sheetName + ' tidak ditemukan.' };
 
     const row = type === 'Masuk'
-      ? [data.noIndeks || '-', data.noAgenda, data.kodeKlasifikasi, data.noSurat, data.tglSurat, data.tglTerima, data.instansi, data.perihal, data.sifatSurat, data.bidang, data.disposisi || '-', data.statusArsip || 'Aktif', data.keterangan || '-', username, fileUrl]
-      : [data.noIndeks || '-', data.noAgenda, data.kodeKlasifikasi, data.noSurat, data.tglSurat, data.instansi, data.perihal, data.sifatSurat, data.bidang, data.statusArsip || 'Aktif', data.keterangan || '-', username, fileUrl];
+      ? [data.noIndeks || '-', data.noAgenda, data.kodeKlasifikasi, data.noSurat, data.tglSurat, data.tglTerima, data.instansi, data.perihal, data.sifatSurat, data.bidang, data.disposisi || '-', data.statusArsip || 'Aktif', data.keterangan || '-', username, fileUrl, data.jenisSurat || '-', data.keperluan || '-', data.tandaTangan || '-']
+      : [data.noIndeks || '-', data.noAgenda, data.kodeKlasifikasi, data.noSurat, data.tglSurat, data.instansi, data.perihal, data.sifatSurat, data.bidang, data.statusArsip || 'Aktif', data.keterangan || '-', username, fileUrl, data.jenisSurat || '-', data.keperluan || '-', data.tandaTangan || '-'];
 
     sheet.appendRow(row);
     logActivity(username, 'Simpan Naskah ' + type, 'Berhasil menyimpan naskah: ' + data.noSurat + (fileUrl ? ' dengan file' : ' (tanpa file)'));

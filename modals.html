@@ -49,20 +49,93 @@
                 </button>
             </div>
         </div>
-        <div class="flex-1 bg-gray-100 relative">
-            <template x-if="preview.url && preview.url.includes('drive.google.com')">
-                <iframe :src="preview.url.replace('/view', '/preview')"
-                    class="w-full h-full border-0 shadow-inner"></iframe>
-            </template>
-            <template x-if="preview.url && !preview.url.includes('drive.google.com')">
-                <iframe :src="preview.url" class="w-full h-full border-0 shadow-inner"></iframe>
-            </template>
-            <template x-if="!preview.url">
-                <div class="flex flex-col items-center justify-center h-full text-gray-400">
-                    <i class="fas fa-file-circle-xmark text-6xl mb-4 opacity-20"></i>
-                    <p>Link file tidak valid atau belum tersedia.</p>
+        <div class="flex-1 flex overflow-hidden bg-gray-50">
+            <!-- Left Side: Detail Informasi (Metadata) -->
+            <div class="w-80 border-r border-gray-100 bg-white overflow-y-auto p-6 flex flex-col justify-between select-none">
+                <div class="space-y-6">
+                    <div class="flex items-center gap-2">
+                        <i class="fas fa-info-circle text-emerald-600"></i>
+                        <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider">Detail Naskah</h4>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <span class="text-xs font-semibold text-gray-400 block uppercase tracking-wider">Jenis Surat</span>
+                            <span class="text-sm font-bold text-gray-800" x-text="preview.item?.jenisSurat || '-'"></span>
+                        </div>
+                        
+                        <div>
+                            <span class="text-xs font-semibold text-gray-400 block uppercase tracking-wider">Nomor Surat</span>
+                            <span class="text-sm font-bold text-gray-800" x-text="preview.item?.noSurat || '-'"></span>
+                        </div>
+                        
+                        <div>
+                            <span class="text-xs font-semibold text-gray-400 block uppercase tracking-wider">Tanggal Surat</span>
+                            <span class="text-sm font-bold text-gray-800" x-text="preview.item?.tglSurat || '-'"></span>
+                        </div>
+
+                        <template x-if="preview.item?.tglTerima && preview.item?.jenis === 'Masuk'">
+                            <div>
+                                <span class="text-xs font-semibold text-gray-400 block uppercase tracking-wider">Tanggal Terima</span>
+                                <span class="text-sm font-bold text-gray-800" x-text="preview.item.tglTerima"></span>
+                            </div>
+                        </template>
+
+                        <div>
+                            <span class="text-xs font-semibold text-gray-400 block uppercase tracking-wider" x-text="preview.item?.jenis === 'Masuk' ? 'Asal Instansi' : 'Tujuan Instansi'"></span>
+                            <span class="text-sm font-bold text-gray-800" x-text="preview.item?.jenis === 'Masuk' ? (preview.item?.asalInstansi || '-') : (preview.item?.tujuanInstansi || '-')"></span>
+                        </div>
+
+                        <div>
+                            <span class="text-xs font-semibold text-gray-400 block uppercase tracking-wider">Perihal</span>
+                            <span class="text-sm font-bold text-gray-800" x-text="preview.item?.perihal || '-'"></span>
+                        </div>
+
+                        <div>
+                            <span class="text-xs font-semibold text-gray-400 block uppercase tracking-wider">Keperluan Surat</span>
+                            <span class="text-sm font-bold text-gray-800" x-text="preview.item?.keperluan || '-'"></span>
+                        </div>
+
+                        <div>
+                            <span class="text-xs font-semibold text-gray-400 block uppercase tracking-wider">Tanda Tangan Surat</span>
+                            <span class="text-sm font-bold text-gray-800" x-text="preview.item?.tandaTangan || '-'"></span>
+                        </div>
+
+                        <div>
+                            <span class="text-xs font-semibold text-gray-400 block uppercase tracking-wider mb-1">Sifat & Bidang</span>
+                            <div class="flex gap-2">
+                                <span class="px-2 py-0.5 text-[10px] rounded-lg font-bold uppercase"
+                                    :class="preview.item?.sifatSurat === 'Penting' ? 'bg-red-50 text-red-700 border border-red-200' : (preview.item?.sifatSurat === 'Rahasia' ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200')"
+                                    x-text="preview.item?.sifatSurat"></span>
+                                <span class="px-2 py-0.5 bg-gray-50 text-gray-700 text-[10px] rounded-lg font-bold border border-gray-200 uppercase"
+                                    x-text="preview.item?.bidang"></span>
+                            </div>
+                        </div>
+
+                        <div>
+                            <span class="text-xs font-semibold text-gray-400 block uppercase tracking-wider">Keterangan</span>
+                            <p class="text-xs text-gray-600 mt-1 leading-relaxed whitespace-pre-line" x-text="preview.item?.keterangan || '-'"></p>
+                        </div>
+                    </div>
                 </div>
-            </template>
+            </div>
+
+            <!-- Right Side: Document Preview Iframe -->
+            <div class="flex-1 bg-gray-100 relative">
+                <template x-if="preview.url && preview.url.includes('drive.google.com')">
+                    <iframe :src="preview.url.replace('/view', '/preview')"
+                        class="w-full h-full border-0 shadow-inner"></iframe>
+                </template>
+                <template x-if="preview.url && !preview.url.includes('drive.google.com')">
+                    <iframe :src="preview.url" class="w-full h-full border-0 shadow-inner"></iframe>
+                </template>
+                <template x-if="!preview.url">
+                    <div class="flex flex-col items-center justify-center h-full text-gray-400">
+                        <i class="fas fa-file-circle-xmark text-6xl mb-4 opacity-20"></i>
+                        <p>Link file tidak valid atau belum tersedia.</p>
+                    </div>
+                </template>
+            </div>
         </div>
     </div>
 </div>
@@ -98,7 +171,27 @@
                             <input type="text" x-model="formData.kodeKlasifikasi" required
                                 class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
                         </div>
-                        <div class="col-span-2">
+                        
+                        <!-- NEW FIELD: Jenis Surat -->
+                        <div class="col-span-1">
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Jenis Surat</label>
+                            <select x-model="formData.jenisSurat" required
+                                class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
+                                <option value="">Pilih Jenis Surat</option>
+                                <option value="Surat Keputusan (SK)">Surat Keputusan (SK)</option>
+                                <option value="Surat Undangan">Surat Undangan</option>
+                                <option value="Surat Tugas">Surat Tugas</option>
+                                <option value="Surat Keterangan (SKET)">Surat Keterangan (SKET)</option>
+                                <option value="Surat Pengantar">Surat Pengantar</option>
+                                <option value="Surat Edaran (SE)">Surat Edaran (SE)</option>
+                                <option value="Surat Kuasa">Surat Kuasa</option>
+                                <option value="Surat Pernyataan">Surat Pernyataan</option>
+                                <option value="Surat Permohonan">Surat Permohonan</option>
+                                <option value="Surat Perjanjian">Surat Perjanjian</option>
+                                <option value="Lainnya">Lainnya / Naskah Dinas Lain</option>
+                            </select>
+                        </div>
+                        <div class="col-span-1">
                             <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Nomor
                                 Surat</label>
                             <input type="text" x-model="formData.noSurat" required
@@ -131,6 +224,21 @@
                             <input type="text" x-model="formData.perihal" required
                                 class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
                         </div>
+
+                        <!-- NEW FIELD: Keperluan Surat -->
+                        <div class="col-span-2">
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Keperluan Surat</label>
+                            <input type="text" x-model="formData.keperluan" placeholder="Contoh: Pengajuan KTP, Rekomendasi Nikah, dll." required
+                                class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
+                        </div>
+
+                        <!-- NEW FIELD: Tanda Tangan Surat -->
+                        <div class="col-span-2">
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Tanda Tangan Surat (Penandatangan)</label>
+                            <input type="text" x-model="formData.tandaTangan" placeholder="Contoh: Kepala Desa, Sekretaris Desa, Kepala Dusun, dll." required
+                                class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
+                        </div>
+
                         <div class="col-span-1">
                             <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Sifat
                                 Surat</label>
@@ -188,7 +296,7 @@
                                 class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
                         </div>
                         <div class="col-span-2">
-                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Keterangan Konfigurasi</label>
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Keterangan Surat</label>
                             <textarea x-model="formData.keterangan" placeholder="Masukkan keterangan (opsional)..." rows="3"
                                 class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none resize-none"></textarea>
                         </div>
