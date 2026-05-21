@@ -18,19 +18,29 @@
                 <div class="p-6 bg-gray-50 rounded-2xl border border-gray-100">
                     <h4 class="font-bold text-gray-900 mb-4">Ganti Password</h4>
                     <div class="space-y-4">
-                        <div>
+                        <div x-data="{ showNewPassword: false }">
                             <label
                                 class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Password
                                 Baru</label>
-                            <input type="password" x-model="profileData.newPassword"
-                                class="w-full p-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
+                            <div class="relative">
+                                <input :type="showNewPassword ? 'text' : 'password'" x-model="profileData.newPassword"
+                                    class="w-full p-3 pr-10 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
+                                <div class="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer" @click="showNewPassword = !showNewPassword">
+                                    <i class="fas text-gray-400 hover:text-gray-600" :class="showNewPassword ? 'fa-eye-slash' : 'fa-eye'"></i>
+                                </div>
+                            </div>
                         </div>
-                        <div>
+                        <div x-data="{ showConfirmPassword: false }">
                             <label
                                 class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Konfirmasi
                                 Password Baru</label>
-                            <input type="password" x-model="profileData.confirmPassword"
-                                class="w-full p-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
+                            <div class="relative">
+                                <input :type="showConfirmPassword ? 'text' : 'password'" x-model="profileData.confirmPassword"
+                                    class="w-full p-3 pr-10 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
+                                <div class="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer" @click="showConfirmPassword = !showConfirmPassword">
+                                    <i class="fas text-gray-400 hover:text-gray-600" :class="showConfirmPassword ? 'fa-eye-slash' : 'fa-eye'"></i>
+                                </div>
+                            </div>
                         </div>
                         <button @click="saveProfileUpdate" :disabled="isLoading"
                             class="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-100 disabled:opacity-50">

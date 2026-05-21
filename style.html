@@ -5,6 +5,10 @@
 
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
+    html {
+        font-size: 16.5px;
+    }
+
     body {
         font-family: 'Inter', sans-serif;
         background-color: #f3f4f6;
@@ -23,10 +27,10 @@
     }
 
     .sidebar-active {
-        background: linear-gradient(90deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0) 100%);
-        border-left: 4px solid #10b981;
-        color: #064e3b;
-        font-weight: 600;
+        background: linear-gradient(90deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.02) 100%) !important;
+        border-left: 4px solid #10b981 !important;
+        color: #34d399 !important;
+        font-weight: 600 !important;
     }
 
     /* Micro-animations */
@@ -51,5 +55,14 @@
     .modal-overlay {
         background: rgba(0, 0, 0, 0.5);
         backdrop-filter: blur(4px);
+    }
+
+    /* Hide scrollbar for Chrome, Safari, Opera, IE, Edge, Firefox */
+    .no-scrollbar::-webkit-scrollbar {
+        display: none;
+    }
+    .no-scrollbar {
+        -ms-overflow-style: none;  /* IE and Edge */
+        scrollbar-width: none;  /* Firefox */
     }
 </style>

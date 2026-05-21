@@ -37,15 +37,18 @@
                 </div>
             </div>
 
-            <div>
+            <div x-data="{ showPassword: false }">
                 <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
                 <div class="relative">
                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <i class="fas fa-lock text-gray-400"></i>
                     </div>
-                    <input type="password" x-model="password" required
-                        class="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors shadow-sm"
+                    <input :type="showPassword ? 'text' : 'password'" x-model="password" required
+                        class="block w-full pl-10 pr-10 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors shadow-sm"
                         placeholder="Masukkan password">
+                    <div class="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer z-20" @click="showPassword = !showPassword">
+                        <i class="fas text-gray-400 hover:text-gray-600 animate-pulse-hover" :class="showPassword ? 'fa-eye-slash' : 'fa-eye'"></i>
+                    </div>
                 </div>
             </div>
 
@@ -82,5 +85,10 @@
                 </button>
             </div>
         </form>
+    </div>
+
+    <!-- Copyright -->
+    <div class="absolute bottom-6 right-8 text-white/50 text-xs font-medium select-none drop-shadow-sm pointer-events-none">
+        &copy; D4 Administrasi Negara UNESA
     </div>
 </div>
