@@ -340,7 +340,11 @@
 
             navigate(page) {
                 this.view = page;
-                this.activeBidangFilter = '';
+                
+                // Hanya hapus filter jika navigasi keluar dari halaman arsip (naskah masuk/keluar)
+                if (page !== 'naskah_masuk' && page !== 'naskah_keluar') {
+                    this.activeBidangFilter = '';
+                }
 
                 // Always ensure dashboard data is available for bidang lists
                 if (!this.dashboardData) this.loadDashboard();
