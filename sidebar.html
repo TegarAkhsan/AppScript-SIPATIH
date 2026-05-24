@@ -53,10 +53,10 @@
             </a>
 
             <a href="#" @click.prevent="navigate('bidang_dokumen')"
-                :class="view === 'bidang_dokumen' ? 'sidebar-active' : 'text-slate-400 hover:bg-slate-800 hover:text-white'"
+                :class="(view === 'bidang_dokumen' || view === 'detail_bidang') ? 'sidebar-active' : 'text-slate-400 hover:bg-slate-800 hover:text-white'"
                 class="group flex items-center px-3 py-2 text-[15px] font-medium rounded-lg transition-colors mt-1.5">
                 <i class="fas fa-layer-group w-6 text-center text-sm"
-                    :class="view === 'bidang_dokumen' ? 'text-emerald-400' : 'text-slate-500 group-hover:text-slate-300'"></i>
+                    :class="(view === 'bidang_dokumen' || view === 'detail_bidang') ? 'text-emerald-400' : 'text-slate-500 group-hover:text-slate-300'"></i>
                 <span class="ml-2">Manajemen Dokumen</span>
             </a>
 

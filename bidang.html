@@ -52,7 +52,7 @@
     <!-- Header Folder -->
     <div class="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div class="flex items-center gap-4">
-            <button @click="navigate('bidang_dokumen')"
+            <button @click="navigate('bidang_dokumen')" x-show="user?.role === 'Admin' || user?.role === 'Kepala Desa' || (user && user.bidang === 'Semua')"
                 class="w-10 h-10 rounded-xl bg-white border border-gray-100 text-gray-600 flex items-center justify-center hover:bg-gray-50 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm">
                 <i class="fas fa-arrow-left"></i>
             </button>

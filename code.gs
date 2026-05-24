@@ -80,6 +80,27 @@ function setupHeaders() {
     }
   }
   
+  // Tambahkan/seeding akun bidang secara dinamis jika belum ada
+  const currentLastRow = sh.getLastRow();
+  if (currentLastRow > 1) {
+    const existingUsers = sh.getRange(2, 2, currentLastRow - 1, 1).getValues().map(r => r[0].toString().toLowerCase().trim());
+    const defaultAccounts = [
+      { username: 'pemerintahan', password: 'pemerintahan', role: 'Perangkat Desa', bidang: 'Pemerintahan' },
+      { username: 'kesejahteraan', password: 'kesejahteraan', role: 'Perangkat Desa', bidang: 'Kesejahteraan' },
+      { username: 'kependudukan', password: 'kependudukan', role: 'Perangkat Desa', bidang: 'Kependudukan' },
+      { username: 'pertanahan', password: 'pertanahan', role: 'Perangkat Desa', bidang: 'Pertanahan' },
+      { username: 'umum', password: 'umum', role: 'Perangkat Desa', bidang: 'Umum' }
+    ];
+
+    defaultAccounts.forEach(acc => {
+      if (!existingUsers.includes(acc.username)) {
+        const nextId = (sh.getLastRow()).toString();
+        sh.appendRow([nextId, acc.username, acc.password, acc.role, 'Aktif', acc.bidang]);
+      }
+    });
+  }
+
+  
   // Aktivitas
   sh = getOrCreateSheet('Aktivitas');
   if(sh.getLastRow() === 0) {

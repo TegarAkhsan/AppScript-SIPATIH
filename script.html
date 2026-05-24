@@ -445,15 +445,25 @@
                     // Mock for local preview
                     setTimeout(() => {
                         this.isLoading = false;
-                        if ((this.username === 'admin' && this.password === 'admin') ||
-                            (this.username === 'user' && this.password === 'user')) {
-                            this.user = { success: true, role: this.username === 'admin' ? 'Admin' : 'Perangkat Desa', username: this.username };
+                        const defaultAccs = {
+                            'admin': { role: 'Admin', bidang: 'Semua' },
+                            'user': { role: 'Perangkat Desa', bidang: 'Pemerintahan' },
+                            'pemerintahan': { role: 'Perangkat Desa', bidang: 'Pemerintahan' },
+                            'kesejahteraan': { role: 'Perangkat Desa', bidang: 'Kesejahteraan' },
+                            'kependudukan': { role: 'Perangkat Desa', bidang: 'Kependudukan' },
+                            'pertanahan': { role: 'Perangkat Desa', bidang: 'Pertanahan' },
+                            'umum': { role: 'Perangkat Desa', bidang: 'Umum' }
+                        };
+                        
+                        const acc = defaultAccs[this.username.toLowerCase()];
+                        if (acc && this.password.toLowerCase() === this.username.toLowerCase()) {
+                            this.user = { success: true, role: acc.role, username: this.username, bidang: acc.bidang };
                             localStorage.setItem('sipatih_user', JSON.stringify(this.user));
                             localStorage.setItem('sipatih_last_activity', Date.now().toString());
                             this.navigate('dashboard');
                             this.showToast('Login Berhasil (Mode Demo)', 'success');
                         } else {
-                            this.loginError = 'Username atau password salah! (Gunakan admin/admin)';
+                            this.loginError = 'Username atau password salah!';
                         }
                     }, 800);
                 }
@@ -476,6 +486,18 @@
             },
 
             navigate(page) {
+                if (page === 'bidang_dokumen') {
+                    if (this.user && this.user.bidang && this.user.bidang !== 'Semua') {
+                        // User has a specific bidang, bypass list and go directly to detail_bidang
+                        this.selectedBidang = this.user.bidang;
+                        this.bidangSearchQuery = '';
+                        this.bidangJenisFilter = '';
+                        this.bidangSifatFilter = '';
+                        this.bidangStatusFilter = '';
+                        page = 'detail_bidang';
+                    }
+                }
+                
                 this.view = page;
                 
                 // Hanya hapus filter jika navigasi keluar dari halaman arsip (naskah masuk/keluar)
