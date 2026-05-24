@@ -57,12 +57,26 @@ function setupHeaders() {
   let sh = getOrCreateSheet('Pengguna');
   if (sh.getLastRow() <= 1) {
     if (sh.getLastRow() === 0) {
-      sh.appendRow(['ID', 'Username', 'Password', 'Role', 'Status']);
+      sh.appendRow(['ID', 'Username', 'Password', 'Role', 'Status', 'Bidang']);
     }
     // Pastikan tidak menduplikasi jika sudah ada data tapi kurang dari 2 baris
     if (sh.getLastRow() === 1) {
-      sh.appendRow(['1', 'admin', 'admin', 'Admin', 'Aktif']);
-      sh.appendRow(['2', 'user', 'user', 'Perangkat Desa', 'Aktif']);
+      sh.appendRow(['1', 'admin', 'admin', 'Admin', 'Aktif', 'Semua']);
+      sh.appendRow(['2', 'user', 'user', 'Perangkat Desa', 'Aktif', 'Pemerintahan']);
+    }
+  } else {
+    // Migrasi kolom Bidang jika belum ada
+    const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+    if (!headers.includes('Bidang')) {
+      const colIndex = sh.getLastColumn() + 1;
+      sh.getRange(1, colIndex).setValue('Bidang');
+      
+      // Berikan nilai default 'Semua' untuk baris data yang ada
+      const lastRow = sh.getLastRow();
+      if (lastRow > 1) {
+        const defaultValues = Array(lastRow - 1).fill(['Semua']);
+        sh.getRange(2, colIndex, lastRow - 1, 1).setValues(defaultValues);
+      }
     }
   }
   
@@ -70,6 +84,12 @@ function setupHeaders() {
   sh = getOrCreateSheet('Aktivitas');
   if(sh.getLastRow() === 0) {
     sh.appendRow(['Timestamp', 'Username', 'Aktivitas', 'Detail']);
+  }
+
+  // Notifikasi
+  sh = getOrCreateSheet('Notifikasi');
+  if(sh.getLastRow() === 0) {
+    sh.appendRow(['ID', 'Timestamp', 'Username', 'Bidang', 'Pesan', 'Status']);
   }
 
   // Naskah Masuk
@@ -137,12 +157,12 @@ function login(username, password) {
       // Jika tabel pengguna kosong sama sekali (tidak termasuk header), izinkan login bypass sementara (atau admin default)
       if(username === 'admin' && password === 'admin') {
         logActivity('admin', 'Login Bypass', 'Login saat tabel pengguna kosong');
-        return { success: true, role: 'Admin', username: 'admin' };
+        return { success: true, role: 'Admin', username: 'admin', bidang: 'Semua' };
       }
       return { success: false, message: 'Tidak ada data pengguna dalam sistem.' };
     }
 
-    const data = sheet.getRange(2, 1, lastRow - 1, 5).getValues();
+    const data = sheet.getRange(2, 1, lastRow - 1, 6).getValues();
     
     for (let i = 0; i < data.length; i++) {
       let row = data[i];
@@ -150,13 +170,14 @@ function login(username, password) {
       let dbPassword = row[2];
       let role = row[3];
       let status = row[4];
+      let bidang = row[5] || 'Semua';
       
       if (dbUsername === username && dbPassword === password) {
         if (status && status.toString().toLowerCase() !== 'aktif') {
           return { success: false, message: 'Akun Anda dinonaktifkan!' };
         }
         logActivity(username, 'Login', 'Berhasil login ke sistem');
-        return { success: true, role: role, username: username };
+        return { success: true, role: role, username: username, bidang: bidang };
       }
     }
     return { success: false, message: 'Username atau password salah!' };
@@ -181,56 +202,93 @@ function logActivity(username, aktivitas, detail) {
 // ----------------------------------------------------
 // Data Retrieval (Dashboard & Table)
 // ----------------------------------------------------
-function getDashboardData() {
+function getDashboardData(username) {
   try {
     checkAndInitializeBidang();
     setupHeaders(); // Pastikan header dan data awal tersedia
     const ss = getSS();
+    
+    // Get user details to check Bidang restriction
+    let userBidang = "Semua";
+    let userRole = "Admin";
+    if (username) {
+      const uSheet = ss.getSheetByName('Pengguna');
+      if (uSheet && uSheet.getLastRow() > 1) {
+        const uData = uSheet.getRange(2, 2, uSheet.getLastRow() - 1, 5).getValues();
+        for (let i = 0; i < uData.length; i++) {
+          if (uData[i][0] === username) {
+            userRole = uData[i][2]; // Column D is index 2 from Col B
+            userBidang = uData[i][4] || "Semua"; // Column F is index 4 from Col B
+            break;
+          }
+        }
+      }
+    }
+    
     const arsipMasukSheet = ss.getSheetByName('Naskah Masuk');
     const arsipKeluarSheet = ss.getSheetByName('Naskah Keluar');
     const klasifikasiSheet = ss.getSheetByName('Klasifikasi Arsip');
     
-    let masukCount = 0, keluarCount = 0;
-    if (arsipMasukSheet && arsipMasukSheet.getLastRow() > 1) {
-      masukCount = arsipMasukSheet.getLastRow() - 1;
-    }
-    if (arsipKeluarSheet && arsipKeluarSheet.getLastRow() > 1) {
-      keluarCount = arsipKeluarSheet.getLastRow() - 1;
-    }
-    const totalArsip = masukCount + keluarCount;
-
     let bidangMap = {};
     let bidangCodes = {};
     if (klasifikasiSheet && klasifikasiSheet.getLastRow() > 1) {
-      const klasData = klasifikasiSheet.getRange(2, 2, klasifikasiSheet.getLastRow() - 1, 2).getValues(); 
+      const klasData = klasifikasiSheet.getRange(2, 1, klasifikasiSheet.getLastRow() - 1, 2).getValues(); // Col A (Nama Bidang) dan Col B (Kode)
       klasData.forEach(row => {
-        let code = row[0];
-        let b = row[1];
-        if(b) {
-          b = b.toString().trim();
-          if(b !== "") {
+        const b = row[0] ? row[0].toString().trim() : "";
+        const code = row[1] ? row[1].toString().trim() : "";
+        
+        // Bidang induk diidentifikasi jika kode memiliki panjang tepat 3 karakter (misal PEM, KES, KEP, PER, UMU)
+        if (code.length === 3 && b) {
+          if (userRole === "Admin" || userRole === "Kepala Desa" || userBidang === "Semua" || b === userBidang) {
             bidangMap[b] = 0;
-            bidangCodes[b] = code ? code.toString().trim().toUpperCase() : b.substring(0, 3).toUpperCase();
+            bidangCodes[b] = code.toUpperCase();
           }
         }
       });
     }
 
-    if (masukCount > 0) {
-      const masukBidang = arsipMasukSheet.getRange(2, 10, masukCount, 1).getValues(); // J column
-      masukBidang.forEach(row => {
-        let b = row[0] ? row[0].toString().trim() : "";
-        if(b) bidangMap[b] = (bidangMap[b] || 0) + 1;
+    let masukCount = 0, keluarCount = 0;
+    let aktifCount = 0, inaktifCount = 0;
+    
+    if (arsipMasukSheet && arsipMasukSheet.getLastRow() > 1) {
+      const allMasuk = arsipMasukSheet.getRange(2, 1, arsipMasukSheet.getLastRow() - 1, 18).getValues();
+      allMasuk.forEach(row => {
+        const b = row[9] ? row[9].toString().trim() : "";
+        if (userRole === "Admin" || userRole === "Kepala Desa" || userBidang === "Semua" || b === userBidang) {
+          masukCount++;
+          const val = row[11] ? row[11].toString().trim().toLowerCase() : "";
+          if (val === 'non aktif' || val === 'inaktif') {
+            inaktifCount++;
+          } else {
+            aktifCount++;
+          }
+          if (b && bidangMap[b] !== undefined) {
+            bidangMap[b] = (bidangMap[b] || 0) + 1;
+          }
+        }
       });
     }
     
-    if (keluarCount > 0) {
-      const keluarBidang = arsipKeluarSheet.getRange(2, 9, keluarCount, 1).getValues(); // I column
-      keluarBidang.forEach(row => {
-        let b = row[0] ? row[0].toString().trim() : "";
-        if(b) bidangMap[b] = (bidangMap[b] || 0) + 1;
+    if (arsipKeluarSheet && arsipKeluarSheet.getLastRow() > 1) {
+      const allKeluar = arsipKeluarSheet.getRange(2, 1, arsipKeluarSheet.getLastRow() - 1, 16).getValues();
+      allKeluar.forEach(row => {
+        const b = row[8] ? row[8].toString().trim() : "";
+        if (userRole === "Admin" || userRole === "Kepala Desa" || userBidang === "Semua" || b === userBidang) {
+          keluarCount++;
+          const val = row[9] ? row[9].toString().trim().toLowerCase() : "";
+          if (val === 'non aktif' || val === 'inaktif') {
+            inaktifCount++;
+          } else {
+            aktifCount++;
+          }
+          if (b && bidangMap[b] !== undefined) {
+            bidangMap[b] = (bidangMap[b] || 0) + 1;
+          }
+        }
       });
     }
+
+    const totalArsip = masukCount + keluarCount;
 
     const bidangList = Object.keys(bidangMap).map(k => ({
       kode: bidangCodes[k] || k.substring(0, 3).toUpperCase(), 
@@ -241,8 +299,8 @@ function getDashboardData() {
     return {
       totalArsip: totalArsip,
       totalBidang: Object.keys(bidangMap).length,
-      arsipAktif: totalArsip, // Anggap semua aktif untuk dashboard sederhana
-      arsipInaktif: 0,
+      arsipAktif: aktifCount,
+      arsipInaktif: inaktifCount,
       bidangList: bidangList
     };
   } catch (e) {
@@ -250,10 +308,27 @@ function getDashboardData() {
   }
 }
 
-function getArsipData() {
+function getArsipData(username) {
   try {
     const ss = getSS();
     let result = [];
+    
+    // Get user details to check Bidang restriction
+    let userBidang = "Semua";
+    let userRole = "Admin";
+    if (username) {
+      const uSheet = ss.getSheetByName('Pengguna');
+      if (uSheet && uSheet.getLastRow() > 1) {
+        const uData = uSheet.getRange(2, 2, uSheet.getLastRow() - 1, 5).getValues();
+        for (let i = 0; i < uData.length; i++) {
+          if (uData[i][0] === username) {
+            userRole = uData[i][2]; // Column D is index 2 from Col B
+            userBidang = uData[i][4] || "Semua"; // Column F is index 4 from Col B
+            break;
+          }
+        }
+      }
+    }
     
     const masukSheet = ss.getSheetByName('Naskah Masuk');
     if (masukSheet && masukSheet.getLastRow() > 1) {
@@ -261,27 +336,30 @@ function getArsipData() {
       const mData = masukSheet.getRange(2, 1, masukSheet.getLastRow() - 1, lastCol).getValues();
       mData.forEach(row => {
         if(!row[0] && !row[3]) return;
-        result.push({
-          jenis: 'Masuk',
-          noIndeks: row[0],
-          noAgenda: row[1],
-          kodeKlasifikasi: row[2],
-          noSurat: row[3],
-          tglSurat: row[4] instanceof Date ? Utilities.formatDate(row[4], 'Asia/Jakarta', 'dd-MM-yyyy') : (row[4] || '-'),
-          tglTerima: row[5] instanceof Date ? Utilities.formatDate(row[5], 'Asia/Jakarta', 'dd-MM-yyyy') : (row[5] || '-'),
-          asalInstansi: row[6],
-          instansi: row[6],
-          perihal: row[7],
-          sifatSurat: row[8],
-          bidang: row[9],
-          disposisi: row[10],
-          statusArsip: row[11],
-          keterangan: row[12],
-          linkFile: row[14],
-          jenisSurat: row[15] || '-',
-          keperluan: row[16] || '-',
-          tandaTangan: row[17] || '-'
-        });
+        const b = row[9] ? row[9].toString().trim() : "";
+        if (userRole === "Admin" || userRole === "Kepala Desa" || userBidang === "Semua" || b === userBidang) {
+          result.push({
+            jenis: 'Masuk',
+            noIndeks: row[0],
+            noAgenda: row[1],
+            kodeKlasifikasi: row[2],
+            noSurat: row[3],
+            tglSurat: row[4] instanceof Date ? Utilities.formatDate(row[4], 'Asia/Jakarta', 'dd-MM-yyyy') : (row[4] || '-'),
+            tglTerima: row[5] instanceof Date ? Utilities.formatDate(row[5], 'Asia/Jakarta', 'dd-MM-yyyy') : (row[5] || '-'),
+            asalInstansi: row[6],
+            instansi: row[6],
+            perihal: row[7],
+            sifatSurat: row[8],
+            bidang: row[9],
+            disposisi: row[10],
+            statusArsip: row[11] || 'Aktif',
+            keterangan: row[12],
+            linkFile: row[14],
+            jenisSurat: row[15] || '-',
+            keperluan: row[16] || '-',
+            tandaTangan: row[17] || '-'
+          });
+        }
       });
     }
 
@@ -291,25 +369,28 @@ function getArsipData() {
       const kData = keluarSheet.getRange(2, 1, keluarSheet.getLastRow() - 1, lastCol).getValues();
       kData.forEach(row => {
         if(!row[0] && !row[3]) return;
-        result.push({
-          jenis: 'Keluar',
-          noIndeks: row[0],
-          noAgenda: row[1],
-          kodeKlasifikasi: row[2],
-          noSurat: row[3],
-          tglSurat: row[4] instanceof Date ? Utilities.formatDate(row[4], 'Asia/Jakarta', 'dd-MM-yyyy') : (row[4] || '-'),
-          tujuanInstansi: row[5],
-          instansi: row[5],
-          perihal: row[6],
-          sifatSurat: row[7],
-          bidang: row[8],
-          statusArsip: row[9],
-          keterangan: row[10],
-          linkFile: row[12],
-          jenisSurat: row[13] || '-',
-          keperluan: row[14] || '-',
-          tandaTangan: row[15] || '-'
-        });
+        const b = row[8] ? row[8].toString().trim() : "";
+        if (userRole === "Admin" || userRole === "Kepala Desa" || userBidang === "Semua" || b === userBidang) {
+          result.push({
+            jenis: 'Keluar',
+            noIndeks: row[0],
+            noAgenda: row[1],
+            kodeKlasifikasi: row[2],
+            noSurat: row[3],
+            tglSurat: row[4] instanceof Date ? Utilities.formatDate(row[4], 'Asia/Jakarta', 'dd-MM-yyyy') : (row[4] || '-'),
+            tujuanInstansi: row[5],
+            instansi: row[5],
+            perihal: row[6],
+            sifatSurat: row[7],
+            bidang: row[8],
+            statusArsip: row[9] || 'Aktif',
+            keterangan: row[10],
+            linkFile: row[12],
+            jenisSurat: row[13] || '-',
+            keperluan: row[14] || '-',
+            tandaTangan: row[15] || '-'
+          });
+        }
       });
     }
     
@@ -341,12 +422,14 @@ function getUsers() {
     const sheet = getSS().getSheetByName('Pengguna');
     if (!sheet || sheet.getLastRow() <= 1) return [];
     
-    const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 5).getValues();
+    const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 6).getValues();
     return data.map(row => ({
       id: row[0],
       username: row[1],
+      password: row[2],
       role: row[3],
-      status: row[4] || 'Aktif'
+      status: row[4] || 'Aktif',
+      bidang: row[5] || 'Semua'
     })).filter(u => u.username);
   } catch (e) {
     return [];
@@ -377,11 +460,42 @@ function saveArsip(type, data, username) {
     if (!sheet) return { success: false, message: 'Sheet ' + sheetName + ' tidak ditemukan.' };
 
     const row = type === 'Masuk' ? 
-      [data.noIndeks, data.noAgenda, data.kodeKlasifikasi, data.noSurat, data.tglSurat, data.tglTerima, data.asalInstansi, data.perihal, data.sifatSurat, data.bidang, data.disposisi, data.statusArsip, data.keterangan, username, data.linkFile, data.jenisSurat || '-', data.keperluan || '-', data.tandaTangan || '-'] :
-      [data.noIndeks, data.noAgenda, data.kodeKlasifikasi, data.noSurat, data.tglSurat, data.tujuanInstansi, data.perihal, data.sifatSurat, data.bidang, data.statusArsip, data.keterangan, username, data.linkFile, data.jenisSurat || '-', data.keperluan || '-', data.tandaTangan || '-'];
+      [data.noIndeks || '-', data.noAgenda, data.kodeKlasifikasi, data.noSurat, data.tglSurat, data.tglTerima, data.asalInstansi, data.perihal, data.sifatSurat, data.bidang, data.disposisi || '-', data.statusArsip || 'Aktif', data.keterangan || '-', username, data.linkFile || '-', data.jenisSurat || '-', data.keperluan || '-', data.tandaTangan || '-'] :
+      [data.noIndeks || '-', data.noAgenda, data.kodeKlasifikasi, data.noSurat, data.tglSurat, data.tujuanInstansi, data.perihal, data.sifatSurat, data.bidang, data.statusArsip || 'Aktif', data.keterangan || '-', username, data.linkFile || '-', data.jenisSurat || '-', data.keperluan || '-', data.tandaTangan || '-'];
 
     sheet.appendRow(row);
     logActivity(username, 'Simpan Naskah ' + type, 'Berhasil menyimpan naskah: ' + data.noSurat);
+    createNotification(type, data, username);
+    
+    // Pembuatan naskah keluar otomatis jika dicentang
+    if (type === 'Masuk' && data.buatKeluarOtomatis) {
+      const kSheet = getSS().getSheetByName('Naskah Keluar');
+      if (kSheet) {
+        const nextKeluarAgenda = getNextNoAgenda('Keluar');
+        const keluarRow = [
+          data.noIndeks || '-',
+          nextKeluarAgenda,
+          data.kodeKlasifikasi,
+          data.noSurat,
+          data.tglSurat,
+          data.asalInstansi, // Tujuan sama dengan asal
+          data.perihal,
+          data.sifatSurat,
+          data.bidang,
+          data.statusArsip || 'Aktif',
+          (data.keterangan || '-') + ' (Dibuat otomatis dari Naskah Masuk)',
+          username,
+          data.linkFile || '-',
+          data.jenisSurat || '-',
+          data.keperluan || '-',
+          data.tandaTangan || '-'
+        ];
+        kSheet.appendRow(keluarRow);
+        logActivity(username, 'Simpan Naskah Keluar (Otomatis)', 'Berhasil menyimpan naskah keluar otomatis untuk naskah: ' + data.noSurat);
+        createNotification('Keluar', { noSurat: data.noSurat, perihal: data.perihal, bidang: data.bidang }, username);
+      }
+    }
+    
     return { success: true };
   } catch (e) {
     return { success: false, message: e.message };
@@ -441,6 +555,36 @@ function saveArsipWithFile(type, data, username, base64Data, fileName) {
 
     sheet.appendRow(row);
     logActivity(username, 'Simpan Naskah ' + type, 'Berhasil menyimpan naskah: ' + data.noSurat + (fileUrl ? ' dengan file' : ' (tanpa file)'));
+    createNotification(type, data, username);
+
+    // Pembuatan naskah keluar otomatis jika dicentang
+    if (type === 'Masuk' && data.buatKeluarOtomatis) {
+      const kSheet = getSS().getSheetByName('Naskah Keluar');
+      if (kSheet) {
+        const nextKeluarAgenda = getNextNoAgenda('Keluar');
+        const keluarRow = [
+          data.noIndeks || '-',
+          nextKeluarAgenda,
+          data.kodeKlasifikasi,
+          data.noSurat,
+          data.tglSurat,
+          data.instansi, // Tujuan sama dengan asal
+          data.perihal,
+          data.sifatSurat,
+          data.bidang,
+          data.statusArsip || 'Aktif',
+          (data.keterangan || '-') + ' (Dibuat otomatis dari Naskah Masuk)',
+          username,
+          fileUrl,
+          data.jenisSurat || '-',
+          data.keperluan || '-',
+          data.tandaTangan || '-'
+        ];
+        kSheet.appendRow(keluarRow);
+        logActivity(username, 'Simpan Naskah Keluar (Otomatis)', 'Berhasil menyimpan naskah keluar otomatis untuk naskah: ' + data.noSurat);
+        createNotification('Keluar', { noSurat: data.noSurat, perihal: data.perihal, bidang: data.bidang }, username);
+      }
+    }
 
     return { success: true, url: fileUrl, warning: uploadWarning };
     
@@ -450,13 +594,118 @@ function saveArsipWithFile(type, data, username, base64Data, fileName) {
   }
 }
 
+function updateArsipWithFile(type, oldNoSurat, data, username, base64Data, fileName) {
+  let fileUrl = data.linkFile || '';
+  let uploadWarning = '';
+
+  // === STEP 1: Attempt File Upload if new file provided ===
+  if (base64Data && fileName) {
+    try {
+      console.log('Memulai upload file baru untuk ' + type + ': ' + fileName);
+      const folderId = type === 'Masuk' ? FOLDER_MASUK_ID : FOLDER_KELUAR_ID;
+      const folder = DriveApp.getFolderById(folderId);
+      
+      const contentType = base64Data.substring(5, base64Data.indexOf(';'));
+      const bytes = Utilities.base64Decode(base64Data.split(',')[1]);
+      const blob = Utilities.newBlob(bytes, contentType, fileName);
+      
+      const file = folder.createFile(blob);
+      try {
+        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      } catch (sharingErr) {
+        console.warn('setSharing gagal: ' + sharingErr.message);
+      }
+      fileUrl = file.getUrl();
+    } catch (uploadErr) {
+      console.error('Upload file gagal: ' + uploadErr.message);
+      uploadWarning = 'File tidak dapat diunggah (' + uploadErr.message + '). Menggunakan file lama.';
+    }
+  }
+
+  // === STEP 2: Find row and Update ===
+  try {
+    const sheetName = type === 'Masuk' ? 'Naskah Masuk' : 'Naskah Keluar';
+    const sheet = getSS().getSheetByName(sheetName);
+    if (!sheet) return { success: false, message: 'Sheet ' + sheetName + ' tidak ditemukan.' };
+    
+    const lastRow = sheet.getLastRow();
+    if (lastRow <= 1) return { success: false, message: 'Tidak ada data arsip.' };
+    
+    const allNoSurat = sheet.getRange(2, 4, lastRow - 1, 1).getValues(); // Kolom D: Nomor Surat
+    let rowIndex = -1;
+    for (let i = 0; i < allNoSurat.length; i++) {
+      if (allNoSurat[i][0] === oldNoSurat) {
+        rowIndex = i + 2;
+        break;
+      }
+    }
+    
+    if (rowIndex === -1) return { success: false, message: 'Naskah dengan nomor surat lama tidak ditemukan.' };
+    
+    // Update the row values
+    const rowRange = sheet.getRange(rowIndex, 1, 1, type === 'Masuk' ? 18 : 16);
+    const rowValues = type === 'Masuk'
+      ? [[data.noIndeks || '-', data.noAgenda, data.kodeKlasifikasi, data.noSurat, data.tglSurat, data.tglTerima, data.instansi, data.perihal, data.sifatSurat, data.bidang, data.disposisi || '-', data.statusArsip || 'Aktif', data.keterangan || '-', username, fileUrl, data.jenisSurat || '-', data.keperluan || '-', data.tandaTangan || '-']]
+      : [[data.noIndeks || '-', data.noAgenda, data.kodeKlasifikasi, data.noSurat, data.tglSurat, data.instansi, data.perihal, data.sifatSurat, data.bidang, data.statusArsip || 'Aktif', data.keterangan || '-', username, fileUrl, data.jenisSurat || '-', data.keperluan || '-', data.tandaTangan || '-']];
+    
+    rowRange.setValues(rowValues);
+    logActivity(username, 'Update Naskah ' + type, 'Berhasil memperbarui naskah: ' + data.noSurat);
+    
+    return { success: true, url: fileUrl, warning: uploadWarning };
+  } catch (err) {
+    console.error('Gagal memperbarui ke sheet: ' + err.message);
+    return { success: false, message: 'Gagal memperbarui data: ' + err.message };
+  }
+}
+
 function saveUser(data, adminUsername) {
   try {
     const sheet = getSS().getSheetByName('Pengguna');
     const id = sheet.getLastRow();
-    sheet.appendRow([id, data.username, data.password, data.role, 'Aktif']);
+    sheet.appendRow([id, data.username, data.password, data.role, 'Aktif', data.bidang || 'Semua']);
     logActivity(adminUsername, 'Tambah Pengguna', 'Menambahkan user baru: ' + data.username);
     return { success: true };
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+}
+
+function updateUser(oldUsername, data, adminUsername) {
+  try {
+    const sheet = getSS().getSheetByName('Pengguna');
+    const dbData = sheet.getDataRange().getValues();
+    for (let i = 1; i < dbData.length; i++) {
+      if (dbData[i][1] === oldUsername) {
+        sheet.getRange(i + 1, 2).setValue(data.username);
+        sheet.getRange(i + 1, 3).setValue(data.password);
+        sheet.getRange(i + 1, 4).setValue(data.role);
+        sheet.getRange(i + 1, 5).setValue(data.status || 'Aktif');
+        sheet.getRange(i + 1, 6).setValue(data.bidang || 'Semua');
+        logActivity(adminUsername, 'Update Pengguna', 'Mengupdate user: ' + oldUsername + ' menjadi ' + data.username);
+        return { success: true };
+      }
+    }
+    return { success: false, message: 'User tidak ditemukan' };
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+}
+
+function deleteUser(usernameToDelete, adminUsername) {
+  try {
+    if (usernameToDelete === adminUsername) {
+      return { success: false, message: 'Tidak dapat menghapus akun Anda sendiri yang sedang aktif!' };
+    }
+    const sheet = getSS().getSheetByName('Pengguna');
+    const dbData = sheet.getDataRange().getValues();
+    for (let i = 1; i < dbData.length; i++) {
+      if (dbData[i][1] === usernameToDelete) {
+        sheet.deleteRow(i + 1);
+        logActivity(adminUsername, 'Hapus Pengguna', 'Menghapus user: ' + usernameToDelete);
+        return { success: true };
+      }
+    }
+    return { success: false, message: 'User tidak ditemukan' };
   } catch (e) {
     return { success: false, message: e.message };
   }
@@ -465,8 +714,7 @@ function saveUser(data, adminUsername) {
 function saveBidang(data, username) {
   try {
     const sheet = getSS().getSheetByName('Klasifikasi Arsip');
-    const baris = sheet.getLastRow();
-    sheet.appendRow([baris, data.kode, data.nama, data.jenis || '-', '-', '-']);
+    sheet.appendRow([data.nama, data.kode.toUpperCase(), '', '-', '']); // Col A: Nama Bidang, Col B: Kode, Col C: Baris, Col D: Jenis Arsip, Col E: Retensi
     logActivity(username, 'Tambah Bidang', 'Menambahkan bidang baru: ' + data.nama);
     return { success: true };
   } catch (e) {
@@ -512,7 +760,7 @@ function deleteBidang(nama, username) {
     const sheet = getSS().getSheetByName('Klasifikasi Arsip');
     const data = sheet.getDataRange().getValues();
     for (let i = 1; i < data.length; i++) {
-      if (data[i][2] === nama) {
+      if (data[i][0] === nama) { // Col A is index 0
         sheet.deleteRow(i + 1);
         logActivity(username, 'Hapus Bidang', 'Menghapus bidang: ' + nama);
         return { success: true };
@@ -529,9 +777,9 @@ function updateBidang(oldNama, newData, username) {
     const sheet = getSS().getSheetByName('Klasifikasi Arsip');
     const data = sheet.getDataRange().getValues();
     for (let i = 1; i < data.length; i++) {
-      if (data[i][2] === oldNama) {
-        sheet.getRange(i + 1, 2).setValue(newData.kode);
-        sheet.getRange(i + 1, 3).setValue(newData.nama);
+      if (data[i][0] === oldNama) { // Col A is index 0
+        sheet.getRange(i + 1, 1).setValue(newData.nama);
+        sheet.getRange(i + 1, 2).setValue(newData.kode.toUpperCase());
         logActivity(username, 'Update Bidang', 'Mengupdate bidang: ' + oldNama + ' menjadi ' + newData.nama);
         return { success: true };
       }
@@ -551,19 +799,36 @@ function initializeBidangBaru() {
       sh = ss.insertSheet('Klasifikasi Arsip');
     }
     
-    // Clear and reset the classification sheet to exactly these 4
+    // Clear and reset the classification sheet with the new column layout and user-defined classifications
     sh.clear();
-    sh.appendRow(['Baris', 'Kode', 'Nama Bidang', 'Jenis Arsip', 'Retensi Aktif', 'Retensi Inaktif']);
+    sh.appendRow(['Nama Bidang', 'Kode', 'Baris', 'Jenis Arsip', 'Retensi Aktif / Inaktif']);
     
     const klasifikasiAwal = [
-      ['2', 'PEM', 'Pemerintahan', '-', '', ''],
-      ['3', 'KES', 'Kesejahteraan', '-', '', ''],
-      ['4', 'KEP', 'Kependudukan', '-', '', ''],
-      ['5', 'UMU', 'Umum', '-', '', '']
+      ['Pemerintahan', 'PEM', '2', '-', ''],
+      ['', 'PEM.01', '', 'Surat Umum', ''],
+      ['', 'PEM.02', '', 'Sosialisasi dan Undangan', ''],
+      
+      ['Kesejahteraan', 'KES', '3', '-', ''],
+      ['', 'KES.01', '', 'Perkawinan', ''],
+      ['', 'KES.02', '', 'Kesejahteraan Sosial', ''],
+      
+      ['Kependudukan', 'KEP', '4', '-', ''],
+      ['', 'KEP.01', '', 'Pindah Keluar / Masuk', ''],
+      ['', 'KEP.02', '', 'Kematian / Akte Kematian', ''],
+      ['', 'KEP.03', '', 'Kelahiran / Akte Lahir', ''],
+      ['', 'KEP.04', '', 'Pembuatan / Perubahan KK', ''],
+      
+      ['Pertanahan', 'PER', '5', '-', ''],
+      ['', 'PER.01', '', 'Mutasi Tanah (Jual beli / waris/ hibah)', ''],
+      ['', 'PER.02', '', 'Mutasi PBB', ''],
+      ['', 'PER.03', '', 'Keterangan Tanah Lainnya', ''],
+      
+      ['Umum', 'UMU', '6', '-', ''],
+      ['', 'UMU.01', '', 'Surat Lainnya', '']
     ];
     klasifikasiAwal.forEach(row => sh.appendRow(row));
     
-    logActivity('Sistem', 'Reset Bidang', 'Inisialisasi bidang dokumen: Pemerintahan, Kesejahteraan, Kependudukan, Umum');
+    logActivity('Sistem', 'Reset Bidang', 'Inisialisasi bidang dokumen lengkap');
     return true;
   } catch (e) {
     console.error('Gagal inisialisasi bidang baru: ' + e.message);
@@ -574,14 +839,275 @@ function initializeBidangBaru() {
 function checkAndInitializeBidang() {
   try {
     const props = PropertiesService.getScriptProperties();
-    const initialized = props.getProperty('bidang_initialized_v3');
+    const initialized = props.getProperty('bidang_initialized_v5');
     if (initialized !== 'true') {
       const success = initializeBidangBaru();
       if (success) {
-        props.setProperty('bidang_initialized_v3', 'true');
+        props.setProperty('bidang_initialized_v5', 'true');
       }
     }
   } catch (e) {
     console.error('Error di checkAndInitializeBidang: ' + e.message);
+  }
+}
+
+// ----------------------------------------------------
+// Fitur Lonceng Notifikasi Realtime
+// ----------------------------------------------------
+function createNotification(type, data, username) {
+  try {
+    const ss = getSS();
+    const sheet = ss.getSheetByName('Notifikasi');
+    if (!sheet) return;
+    
+    const timestamp = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyy-MM-dd HH:mm:ss');
+    const id = sheet.getLastRow();
+    
+    const isMasuk = type === 'Masuk';
+    const tipeText = isMasuk ? 'Surat Masuk' : 'Surat Keluar';
+    
+    const pesan = `Naskah ${tipeText} baru nomor ${data.noSurat} perihal "${data.perihal}" bidang ${data.bidang} telah diinput oleh ${username}.`;
+    
+    sheet.appendRow([id, timestamp, username, data.bidang, pesan, 'Belum Dibaca']);
+  } catch (e) {
+    console.error('Gagal membuat notifikasi: ' + e.message);
+  }
+}
+
+function getNotifications(username) {
+  try {
+    const ss = getSS();
+    const sheet = ss.getSheetByName('Notifikasi');
+    if (!sheet || sheet.getLastRow() <= 1) return [];
+    
+    // Get user details
+    let userBidang = "Semua";
+    let userRole = "Admin";
+    if (username) {
+      const uSheet = ss.getSheetByName('Pengguna');
+      if (uSheet && uSheet.getLastRow() > 1) {
+        const uData = uSheet.getRange(2, 2, uSheet.getLastRow() - 1, 5).getValues();
+        for (let i = 0; i < uData.length; i++) {
+          if (uData[i][0] === username) {
+            userRole = uData[i][2];
+            userBidang = uData[i][4] || "Semua";
+            break;
+          }
+        }
+      }
+    }
+
+    const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 6).getValues();
+    const result = [];
+    
+    data.forEach((row, index) => {
+      const id = row[0];
+      const timestamp = row[1] instanceof Date ? Utilities.formatDate(row[1], 'Asia/Jakarta', 'yyyy-MM-dd HH:mm:ss') : row[1];
+      const targetUser = row[2];
+      const targetBidang = row[3];
+      const pesan = row[4];
+      const status = row[5];
+      
+      // Admin/Kepala Desa melihat semua notifikasi
+      if (userRole === "Admin" || userRole === "Kepala Desa") {
+        result.push({ id, timestamp, pesan, status });
+      } 
+      // User biasa melihat notifikasi yang sesuai bidang mereka atau yang diinput oleh mereka sendiri
+      else if (targetBidang === userBidang || targetUser === username) {
+        result.push({ id, timestamp, pesan, status });
+      }
+    });
+    
+    return result.reverse().slice(0, 30); // Kembalikan 30 notifikasi terbaru, terbalik (terbaru pertama)
+  } catch (e) {
+    return [];
+  }
+}
+
+function markNotificationsAsRead(username) {
+  try {
+    const ss = getSS();
+    const sheet = ss.getSheetByName('Notifikasi');
+    if (!sheet || sheet.getLastRow() <= 1) return { success: true };
+    
+    // Get user details
+    let userBidang = "Semua";
+    let userRole = "Admin";
+    if (username) {
+      const uSheet = ss.getSheetByName('Pengguna');
+      if (uSheet && uSheet.getLastRow() > 1) {
+        const uData = uSheet.getRange(2, 2, uSheet.getLastRow() - 1, 5).getValues();
+        for (let i = 0; i < uData.length; i++) {
+          if (uData[i][0] === username) {
+            userRole = uData[i][2];
+            userBidang = uData[i][4] || "Semua";
+            break;
+          }
+        }
+      }
+    }
+
+    const lastRow = sheet.getLastRow();
+    const data = sheet.getRange(2, 1, lastRow - 1, 6).getValues();
+    
+    for (let i = 0; i < data.length; i++) {
+      const targetUser = data[i][2];
+      const targetBidang = data[i][3];
+      const status = data[i][5];
+      
+      if (status === 'Belum Dibaca') {
+        if (userRole === "Admin" || userRole === "Kepala Desa" || targetBidang === userBidang || targetUser === username) {
+          sheet.getRange(i + 2, 6).setValue('Dibaca');
+        }
+      }
+    }
+    return { success: true };
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+}
+
+// ----------------------------------------------------
+// Fitur Retensi Surat (Aktif / Non Aktif)
+// ----------------------------------------------------
+function setArsipStatus(type, noSurat, status, username) {
+  try {
+    const sheetName = type === 'Masuk' ? 'Naskah Masuk' : 'Naskah Keluar';
+    const sheet = getSS().getSheetByName(sheetName);
+    if (!sheet) return { success: false, message: 'Sheet ' + sheetName + ' tidak ditemukan.' };
+    
+    const lastRow = sheet.getLastRow();
+    if (lastRow <= 1) return { success: false, message: 'Tidak ada data arsip.' };
+    
+    const data = sheet.getRange(2, 4, lastRow - 1, 1).getValues(); // Kolom D: Nomor Surat
+    const statusColIndex = type === 'Masuk' ? 12 : 10; // Kolom L untuk Masuk, Kolom J untuk Keluar
+    
+    for (let i = 0; i < data.length; i++) {
+      if (data[i][0] === noSurat) {
+        sheet.getRange(i + 2, statusColIndex).setValue(status);
+        logActivity(username, 'Update Status Arsip', `Mengubah status naskah ${type} nomor ${noSurat} menjadi ${status}`);
+        return { success: true };
+      }
+    }
+    return { success: false, message: 'Naskah tidak ditemukan.' };
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+}
+
+// ----------------------------------------------------
+// Fitur Nomor Agenda Otomatis
+// ----------------------------------------------------
+function getNextNoAgenda(type) {
+  try {
+    const sheetName = type === 'Masuk' ? 'Naskah Masuk' : 'Naskah Keluar';
+    const sheet = getSS().getSheetByName(sheetName);
+    const lastRow = sheet ? sheet.getLastRow() : 1;
+    const nextSeq = lastRow > 0 ? lastRow : 1; // Jika hanya header (lastRow=1), data=0, seq berikutnya=1
+    
+    const paddedSeq = nextSeq.toString().padStart(3, '0');
+    
+    const now = new Date();
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const year = now.getFullYear();
+    
+    const code = type === 'Masuk' ? 'SM' : 'SK';
+    
+    return `${paddedSeq}/${code}/${month}/${year}`;
+  } catch (e) {
+    return "";
+  }
+}
+
+// ----------------------------------------------------
+// Fitur Kode Klasifikasi Otomatis
+// ----------------------------------------------------
+function getKlasifikasiOptions() {
+  try {
+    const ss = getSS();
+    const sheet = ss.getSheetByName('Klasifikasi Arsip');
+    if (!sheet) return [];
+    
+    const lastRow = sheet.getLastRow();
+    if (lastRow <= 1) return [];
+    
+    const data = sheet.getRange(2, 1, lastRow - 1, 5).getValues();
+    const result = [];
+    
+    let currentBidang = "";
+    
+    data.forEach(row => {
+      const bName = row[0] ? row[0].toString().trim() : "";
+      const code = row[1] ? row[1].toString().trim() : "";
+      const baris = row[2] ? row[2].toString().trim() : "";
+      const jenisArsip = row[3] ? row[3].toString().trim() : "";
+      
+      // Update bidang induk jika kodenya 3 karakter (PEM, KES, KEP, PER, UMU)
+      if (code.length === 3 && bName) {
+        currentBidang = bName;
+      }
+      
+      // Ambil jenis arsip jika kodenya 6 karakter (PEM.01, KES.01, dll.)
+      if (code.length === 6 && jenisArsip && jenisArsip !== "-") {
+        result.push({
+          bidang: currentBidang || bName,
+          kode: code,
+          baris: baris,
+          jenisArsip: jenisArsip
+        });
+      }
+    });
+    
+    return result;
+  } catch (e) {
+    return [];
+  }
+}
+
+function getNextKodeKlasifikasi(bidang, jenisArsip) {
+  try {
+    const ss = getSS();
+    const kOptions = getKlasifikasiOptions();
+    let parentKode = "";
+    
+    for (let i = 0; i < kOptions.length; i++) {
+      if (kOptions[i].bidang.toLowerCase() === bidang.toLowerCase() && kOptions[i].jenisArsip.toLowerCase() === jenisArsip.toLowerCase()) {
+        parentKode = kOptions[i].kode;
+        break;
+      }
+    }
+    
+    if (!parentKode) return "";
+    
+    let docCount = 0;
+    
+    const mSheet = ss.getSheetByName('Naskah Masuk');
+    if (mSheet && mSheet.getLastRow() > 1) {
+      const mCodes = mSheet.getRange(2, 3, mSheet.getLastRow() - 1, 1).getValues();
+      mCodes.forEach(row => {
+        const codeVal = row[0] ? row[0].toString().trim() : "";
+        if (codeVal.startsWith(parentKode)) {
+          docCount++;
+        }
+      });
+    }
+    
+    const kSheetDoc = ss.getSheetByName('Naskah Keluar');
+    if (kSheetDoc && kSheetDoc.getLastRow() > 1) {
+      const kCodes = kSheetDoc.getRange(2, 3, kSheetDoc.getLastRow() - 1, 1).getValues();
+      kCodes.forEach(row => {
+        const codeVal = row[0] ? row[0].toString().trim() : "";
+        if (codeVal.startsWith(parentKode)) {
+          docCount++;
+        }
+      });
+    }
+    
+    const nextIndex = docCount + 1;
+    const paddedIndex = nextIndex.toString().padStart(2, '0');
+    
+    return `${parentKode}.${paddedIndex}`;
+  } catch (e) {
+    return "";
   }
 }

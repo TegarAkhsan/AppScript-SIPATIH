@@ -20,7 +20,7 @@
                     <i class="fas fa-plus mr-2"></i> Input Naskah Baru
                 </button>
                 <div class="relative">
-                    <input type="text" placeholder="Cari..."
+                    <input type="text" placeholder="Cari..." x-model="searchQuery"
                         class="pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none w-48 shadow-sm transition-all focus:w-64">
                     <i class="fas fa-search absolute left-3 top-2.5 text-gray-400"></i>
                 </div>
@@ -64,12 +64,32 @@
                                     x-text="arsip.sifatSurat"></span>
                             </td>
                             <td class="px-6 py-4 text-sm">
-                                <button @click="openPreview(arsip)"
-                                    class="text-emerald-600 hover:bg-emerald-50 w-8 h-8 rounded-lg transition-colors"><i
-                                        class="fas fa-eye"></i></button>
-                                <a :href="arsip.linkFile" target="_blank"
-                                    class="text-teal-600 hover:bg-teal-50 w-8 h-8 rounded-lg transition-colors inline-flex items-center justify-center"><i
-                                        class="fas fa-download"></i></a>
+                                <div class="flex items-center gap-1">
+                                    <button @click="openPreview(arsip)" title="Detail"
+                                        class="text-emerald-600 hover:bg-emerald-50 w-8 h-8 rounded-lg transition-colors inline-flex items-center justify-center">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button @click="openForm(view, arsip)" title="Edit Naskah"
+                                        class="text-amber-600 hover:bg-amber-50 w-8 h-8 rounded-lg transition-colors inline-flex items-center justify-center">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <a :href="arsip.linkFile" target="_blank" title="Download"
+                                        class="text-teal-600 hover:bg-teal-50 w-8 h-8 rounded-lg transition-colors inline-flex items-center justify-center">
+                                        <i class="fas fa-download"></i>
+                                    </a>
+                                </div>
+                                <div class="flex items-center gap-1 mt-1.5 select-none">
+                                    <button @click="changeStatus(arsip, 'Aktif')" 
+                                            :class="arsip.statusArsip === 'Aktif' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'"
+                                            class="px-2 py-0.5 text-[10px] font-bold rounded transition-all">
+                                        Aktif
+                                    </button>
+                                    <button @click="changeStatus(arsip, 'Non Aktif')" 
+                                            :class="arsip.statusArsip === 'Non Aktif' || arsip.statusArsip === 'Inaktif' ? 'bg-red-600 text-white shadow-sm' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'"
+                                            class="px-2 py-0.5 text-[10px] font-bold rounded transition-all">
+                                        Non Aktif
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                     </template>

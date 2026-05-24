@@ -168,27 +168,19 @@
                         <div class="col-span-1">
                             <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Kode
                                 Klasifikasi</label>
-                            <input type="text" x-model="formData.kodeKlasifikasi" required
-                                class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
+                            <input type="text" x-model="formData.kodeKlasifikasi" readonly required placeholder="Otomatis terisi..."
+                                class="w-full p-3 bg-gray-100 border border-gray-200 text-gray-500 cursor-not-allowed rounded-xl outline-none">
                         </div>
                         
-                        <!-- NEW FIELD: Jenis Surat -->
+                        <!-- NEW FIELD: Jenis Surat (Dinamis dari Klasifikasi) -->
                         <div class="col-span-1">
-                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Jenis Surat</label>
-                            <select x-model="formData.jenisSurat" required
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Jenis Surat / Klasifikasi</label>
+                            <select x-model="formData.jenisSurat" required @change="onJenisSuratChange()"
                                 class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
                                 <option value="">Pilih Jenis Surat</option>
-                                <option value="Surat Keputusan (SK)">Surat Keputusan (SK)</option>
-                                <option value="Surat Undangan">Surat Undangan</option>
-                                <option value="Surat Tugas">Surat Tugas</option>
-                                <option value="Surat Keterangan (SKET)">Surat Keterangan (SKET)</option>
-                                <option value="Surat Pengantar">Surat Pengantar</option>
-                                <option value="Surat Edaran (SE)">Surat Edaran (SE)</option>
-                                <option value="Surat Kuasa">Surat Kuasa</option>
-                                <option value="Surat Pernyataan">Surat Pernyataan</option>
-                                <option value="Surat Permohonan">Surat Permohonan</option>
-                                <option value="Surat Perjanjian">Surat Perjanjian</option>
-                                <option value="Lainnya">Lainnya / Naskah Dinas Lain</option>
+                                <template x-for="opt in jenisArsipOptions" :key="opt.jenisArsip">
+                                    <option :value="opt.jenisArsip" x-text="opt.jenisArsip"></option>
+                                </template>
                             </select>
                         </div>
                         <div class="col-span-1">
@@ -252,15 +244,13 @@
                         <div class="col-span-1">
                             <label
                                 class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Bidang</label>
-                            <select x-model="formData.bidang" required
+                            <select x-model="formData.bidang" required @change="onBidangChange()"
                                 class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
                                 <option value="">Pilih Bidang</option>
-                                <template x-if="formModal.type === 'naskah_masuk'">
-                                    <template x-for="opt in ['Pemerintahan', 'Kesejahteraan', 'Kependudukan', 'Umum']" :key="opt">
-                                        <option :value="opt" x-text="opt"></option>
-                                    </template>
+                                <template x-if="user && user.bidang !== 'Semua'">
+                                    <option :value="user.bidang" x-text="user.bidang"></option>
                                 </template>
-                                <template x-if="formModal.type !== 'naskah_masuk'">
+                                <template x-if="!user || user.bidang === 'Semua'">
                                     <template x-for="b in dashboardData?.bidangList" :key="b.nama">
                                         <option :value="b.nama" x-text="b.nama"></option>
                                     </template>
@@ -300,6 +290,20 @@
                             <textarea x-model="formData.keterangan" placeholder="Masukkan keterangan (opsional)..." rows="3"
                                 class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none resize-none"></textarea>
                         </div>
+                        
+                        <!-- Opsi buat naskah keluar otomatis (hanya di naskah masuk) -->
+                        <template x-if="formModal.type === 'naskah_masuk'">
+                            <div class="col-span-2 bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100/50 mt-2 select-none">
+                                <label class="flex items-start cursor-pointer">
+                                    <input type="checkbox" x-model="formData.buatKeluarOtomatis"
+                                        class="w-5 h-5 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500 mt-0.5">
+                                    <span class="ml-3 text-sm">
+                                        <span class="font-bold text-emerald-800 block">Buat Naskah Keluar Otomatis</span>
+                                        <span class="text-xs text-emerald-600 block mt-0.5">Sistem akan otomatis membuat salinan dokumen ini ke Naskah Keluar dengan agenda keluar yang sesuai untuk mempermudah administrasi.</span>
+                                    </span>
+                                </label>
+                            </div>
+                        </template>
                     </div>
                 </template>
 
@@ -330,6 +334,17 @@
                                 <option value="Admin">Admin</option>
                                 <option value="Perangkat Desa">Perangkat Desa</option>
                                 <option value="Kepala Desa">Kepala Desa</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label
+                                class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Bidang / Divisi</label>
+                            <select x-model="formData.bidang" required
+                                class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none">
+                                <option value="Semua">Semua Bidang (Akses Penuh)</option>
+                                <template x-for="b in dashboardData?.bidangList" :key="b.nama">
+                                    <option :value="b.nama" x-text="b.nama"></option>
+                                </template>
                             </select>
                         </div>
                     </div>

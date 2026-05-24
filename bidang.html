@@ -1,8 +1,9 @@
+<!-- Bidang List View -->
 <div x-show="view === 'bidang_dokumen'" x-transition:enter="transition ease-out duration-300"
     x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100">
-    <div class="mb-6 flex justify-between items-center">
+    <div class="mb-6 flex justify-between items-center select-none">
         <h3 class="text-xl font-bold text-gray-900">Manajemen Kategori Bidang</h3>
-        <button @click="openForm('bidang')"
+        <button @click="openForm('bidang')" x-show="user?.role === 'Admin'"
             class="px-5 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-emerald-200 btn-hover">
             <i class="fas fa-plus mr-2"></i> Tambah Bidang
         </button>
@@ -20,7 +21,7 @@
                         <span class="px-2.5 py-1 bg-gray-100 text-gray-600 text-xs font-semibold rounded-lg"
                             x-text="'Kode: ' + bidang.kode"></span>
                         <!-- Actions (Hidden by default, shown on hover or for admin) -->
-                        <div class="flex gap-1 opacity-0 group-hover/card:opacity-100 transition-opacity">
+                        <div x-show="user?.role === 'Admin'" class="flex gap-1 opacity-0 group-hover/card:opacity-100 transition-opacity">
                             <button @click.stop="openForm('bidang', bidang)"
                                 class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 flex items-center justify-center transition-colors">
                                 <i class="fas fa-edit text-xs"></i>
@@ -39,6 +40,176 @@
                     Lihat Dokumen <i
                         class="fas fa-arrow-right ml-2 group-hover:translate-x-1 transition-transform"></i>
                 </div>
+            </div>
+        </template>
+    </div>
+</div>
+
+<!-- Bidang Detail View (Folder Contents) -->
+<div x-show="view === 'detail_bidang'" x-transition:enter="transition ease-out duration-300"
+    x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100">
+    
+    <!-- Header Folder -->
+    <div class="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div class="flex items-center gap-4">
+            <button @click="navigate('bidang_dokumen')"
+                class="w-10 h-10 rounded-xl bg-white border border-gray-100 text-gray-600 flex items-center justify-center hover:bg-gray-50 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <h3 class="text-xl font-bold text-gray-900" x-text="'Folder: ' + selectedBidang"></h3>
+                </div>
+                <p class="text-sm text-gray-500 mt-0.5">Menampilkan semua naskah masuk & keluar untuk kategori ini</p>
+            </div>
+        </div>
+        
+        <!-- Stats Mini inside Folder -->
+        <div class="flex items-center gap-4 select-none bg-white p-3 rounded-2xl border border-gray-100 shadow-sm">
+            <div class="text-center px-4 border-r border-gray-100">
+                <span class="text-xs font-semibold text-gray-400 block">Total Arsip</span>
+                <span class="text-lg font-bold text-gray-800" x-text="filteredBidangArsipData.length"></span>
+            </div>
+            <div class="text-center px-4">
+                <span class="text-xs font-semibold text-gray-400 block">Aktif</span>
+                <span class="text-lg font-bold text-emerald-600" x-text="filteredBidangArsipData.filter(a => a.statusArsip === 'Aktif').length"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search & Filter Controls -->
+    <div class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm mb-6 flex flex-col lg:flex-row gap-4">
+        <!-- Search Input -->
+        <div class="flex-1 relative">
+            <i class="fas fa-search absolute left-4 top-3.5 text-gray-400"></i>
+            <input type="text" x-model="bidangSearchQuery" placeholder="Cari berdasarkan No. Surat, Perihal, Instansi, Keterangan..."
+                class="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all text-sm">
+        </div>
+
+        <!-- Filters -->
+        <div class="grid grid-cols-3 gap-3 w-full lg:w-auto">
+            <!-- Jenis Naskah Dropdown -->
+            <select x-model="bidangJenisFilter"
+                class="px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer">
+                <option value="">Semua Jenis</option>
+                <option value="Masuk">Naskah Masuk</option>
+                <option value="Keluar">Naskah Keluar</option>
+            </select>
+
+            <!-- Sifat Surat Dropdown -->
+            <select x-model="bidangSifatFilter"
+                class="px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer">
+                <option value="">Semua Sifat</option>
+                <option value="Biasa">Biasa</option>
+                <option value="Penting">Penting</option>
+                <option value="Rahasia">Rahasia</option>
+            </select>
+
+            <!-- Status Dropdown -->
+            <select x-model="bidangStatusFilter"
+                class="px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer">
+                <option value="">Semua Status</option>
+                <option value="Aktif">Aktif</option>
+                <option value="Non Aktif">Non Aktif</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Table List -->
+    <div class="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full border-collapse text-left">
+                <thead>
+                    <tr class="bg-gray-50 border-b border-gray-100 text-xs font-bold text-gray-400 uppercase tracking-wider">
+                        <th class="p-5 select-none">No. Agenda</th>
+                        <th class="p-5 select-none">Jenis</th>
+                        <th class="p-5">Surat & Tanggal</th>
+                        <th class="p-5">Instansi Asal/Tujuan</th>
+                        <th class="p-5">Perihal / Jenis Surat</th>
+                        <th class="p-5 select-none">Status</th>
+                        <th class="p-5 text-center select-none">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50">
+                    <template x-for="arsip in filteredBidangArsipData" :key="arsip.noSurat">
+                        <tr class="hover:bg-gray-50/50 transition-colors text-sm">
+                            <!-- No. Agenda -->
+                            <td class="p-5 font-bold text-gray-900 select-all" x-text="arsip.noAgenda"></td>
+                            
+                            <!-- Jenis -->
+                            <td class="p-5 select-none">
+                                <span class="px-2.5 py-1 text-[11px] font-bold rounded-lg uppercase tracking-wider"
+                                    :class="arsip.jenis === 'Masuk' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-blue-50 text-blue-700 border border-blue-100'"
+                                    x-text="arsip.jenis"></span>
+                            </td>
+                            
+                            <!-- Surat & Tanggal -->
+                            <td class="p-5">
+                                <span class="font-bold text-gray-800 block select-all" x-text="arsip.noSurat"></span>
+                                <span class="text-xs text-gray-400 mt-0.5 block" x-text="'Tgl: ' + arsip.tglSurat"></span>
+                            </td>
+                            
+                            <!-- Instansi -->
+                            <td class="p-5 text-gray-700 font-medium font-semibold" x-text="arsip.instansi || '-'"></td>
+                            
+                            <!-- Perihal / Jenis Surat -->
+                            <td class="p-5">
+                                <span class="font-bold text-gray-800 block" x-text="arsip.perihal"></span>
+                                <span class="text-xs text-gray-400 mt-0.5 block uppercase tracking-wider font-semibold" x-text="'Kategori: ' + (arsip.jenisSurat || '-')"></span>
+                            </td>
+                            
+                            <!-- Status -->
+                            <td class="p-5 select-none">
+                                <span class="px-2.5 py-1 text-xs font-bold rounded-lg border"
+                                    :class="arsip.statusArsip === 'Aktif' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'"
+                                    x-text="arsip.statusArsip"></span>
+                            </td>
+                            
+                            <!-- Aksi -->
+                            <td class="p-5">
+                                <div class="flex items-center justify-center gap-2">
+                                    <!-- Preview Button -->
+                                    <button @click="openPreview(arsip)"
+                                        class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 flex items-center justify-center transition-colors tooltip"
+                                        title="Preview Dokumen">
+                                        <i class="fas fa-eye text-xs"></i>
+                                    </button>
+
+                                    <!-- Edit Button -->
+                                    <button @click="openForm(arsip.jenis === 'Masuk' ? 'naskah_masuk' : 'naskah_keluar', arsip)"
+                                        class="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 hover:bg-amber-100 flex items-center justify-center transition-colors tooltip"
+                                        title="Edit Dokumen">
+                                        <i class="fas fa-edit text-xs"></i>
+                                    </button>
+
+                                    <!-- Status Toggle Buttons -->
+                                    <button @click="changeStatus(arsip, 'Aktif')"
+                                        class="px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border shadow-sm flex items-center gap-1 select-none cursor-pointer"
+                                        :class="arsip.statusArsip === 'Aktif' ? 'bg-emerald-600 border-emerald-600 text-white shadow-emerald-100 shadow-md' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'">
+                                        <i class="fas fa-check text-[10px]"></i> Aktif
+                                    </button>
+                                    <button @click="changeStatus(arsip, 'Non Aktif')"
+                                        class="px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border shadow-sm flex items-center gap-1 select-none cursor-pointer"
+                                        :class="arsip.statusArsip === 'Non Aktif' ? 'bg-red-600 border-red-600 text-white shadow-red-100 shadow-md' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'">
+                                        <i class="fas fa-times text-[10px]"></i> Non Aktif
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Empty State -->
+        <template x-if="filteredBidangArsipData.length === 0">
+            <div class="p-16 flex flex-col items-center justify-center text-center select-none bg-white">
+                <div class="w-24 h-24 rounded-full bg-gray-50 text-gray-400 flex items-center justify-center text-4xl mb-4 border border-gray-100 shadow-inner">
+                    <i class="fas fa-folder-open opacity-30"></i>
+                </div>
+                <h4 class="text-base font-bold text-gray-800 mb-1">Tidak ada Dokumen</h4>
+                <p class="text-xs text-gray-500 max-w-sm leading-relaxed">Belum ada naskah masuk atau keluar yang sesuai dengan kriteria penyaringan di bidang ini.</p>
             </div>
         </template>
     </div>

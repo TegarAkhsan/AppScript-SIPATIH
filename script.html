@@ -6,16 +6,24 @@
 
             username: '',
             password: '',
-            rememberMe: 'no',
             loginError: '',
             isLoading: false,
 
-            dashboardData: null,
+             dashboardData: null,
             arsipData: [],
             usersData: [],
             aktivitasData: [],
+            notifications: [],
+            klasifikasiOptions: [],
+            jenisArsipOptions: [],
+            searchQuery: '',
 
             activeBidangFilter: '',
+            selectedBidang: '',
+            bidangSearchQuery: '',
+            bidangJenisFilter: '',
+            bidangSifatFilter: '',
+            bidangStatusFilter: '',
 
             toast: { show: false, message: '', type: 'info' },
             errorModal: { show: false, message: '' },
@@ -31,23 +39,89 @@
                 noSurat: '',
                 tglSurat: '',
                 keperluan: '',
-                tandaTangan: ''
+                tandaTangan: '',
+                buatKeluarOtomatis: false
             },
             filterDownload: { startDate: '', endDate: '' },
             profileData: { newPassword: '', confirmPassword: '' },
 
+            get unreadNotificationsCount() {
+                return this.notifications.filter(n => n.status === 'Belum Dibaca').length;
+            },
+
             get filteredArsipData() {
                 let data = this.arsipData;
+                if (this.user && this.user.role !== 'Admin' && this.user.role !== 'Kepala Desa') {
+                    const uBidang = this.user.bidang;
+                    if (uBidang && uBidang !== 'Semua') {
+                        data = data.filter(a => a.bidang === uBidang);
+                    }
+                }
                 if (this.activeBidangFilter) {
                     data = data.filter(a => a.bidang === this.activeBidangFilter);
                 }
+                if (this.searchQuery) {
+                    const q = this.searchQuery.toLowerCase();
+                    data = data.filter(a => 
+                        (a.noSurat && a.noSurat.toLowerCase().includes(q)) ||
+                        (a.perihal && a.perihal.toLowerCase().includes(q)) ||
+                        (a.asalInstansi && a.asalInstansi.toLowerCase().includes(q)) ||
+                        (a.tujuanInstansi && a.tujuanInstansi.toLowerCase().includes(q)) ||
+                        (a.keterangan && a.keterangan.toLowerCase().includes(q))
+                    );
+                }
+                return data;
+            },
+
+            get filteredBidangArsipData() {
+                let data = this.arsipData;
+                
+                // Filter by selected Bidang
+                if (this.selectedBidang) {
+                    data = data.filter(a => a.bidang.toLowerCase() === this.selectedBidang.toLowerCase());
+                }
+                
+                // Filter by Jenis (Masuk / Keluar)
+                if (this.bidangJenisFilter) {
+                    data = data.filter(a => a.jenis === this.bidangJenisFilter);
+                }
+                
+                // Filter by Sifat Surat
+                if (this.bidangSifatFilter) {
+                    data = data.filter(a => a.sifatSurat === this.bidangSifatFilter);
+                }
+                
+                // Filter by Status Arsip
+                if (this.bidangStatusFilter) {
+                    data = data.filter(a => a.statusArsip === this.bidangStatusFilter);
+                }
+                
+                // Filter by Search Query
+                if (this.bidangSearchQuery) {
+                    const q = this.bidangSearchQuery.toLowerCase();
+                    data = data.filter(a => 
+                        (a.noSurat && a.noSurat.toLowerCase().includes(q)) ||
+                        (a.perihal && a.perihal.toLowerCase().includes(q)) ||
+                        (a.instansi && a.instansi.toLowerCase().includes(q)) ||
+                        (a.noAgenda && a.noAgenda.toLowerCase().includes(q)) ||
+                        (a.jenisSurat && a.jenisSurat.toLowerCase().includes(q)) ||
+                        (a.keterangan && a.keterangan.toLowerCase().includes(q))
+                    );
+                }
+                
                 return data;
             },
 
             init() {
                 this.checkSession();
-                // Jalankan pengecekan sesi setiap 1 menit
-                setInterval(() => this.checkSession(), 60000);
+                this.loadKlasifikasiOptions();
+                this.loadNotifications();
+                
+                // Jalankan pengecekan sesi dan notifikasi realtime setiap 15 detik
+                setInterval(() => {
+                    this.checkSession();
+                    this.loadNotifications();
+                }, 15000);
                 
                 // Pantau aktivitas user untuk memperbarui timestamp
                 ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'].forEach(name => {
@@ -118,21 +192,60 @@
                         this.formModal.oldNama = item.nama;
                         this.formModal.title = 'Edit Kategori Bidang';
                     }
+                    if (type === 'pengguna') {
+                        this.formModal.oldNama = item.username;
+                        this.formModal.title = 'Edit Pengguna';
+                    }
+                    if (type === 'naskah_masuk' || type === 'naskah_keluar') {
+                        this.formModal.title = type === 'naskah_masuk' ? 'Edit Naskah Masuk' : 'Edit Naskah Keluar';
+                        this.formModal.oldNoSurat = item.noSurat;
+                        if (this.user && this.user.bidang && this.user.bidang !== 'Semua') {
+                            this.jenisArsipOptions = this.klasifikasiOptions.filter(o => o.bidang.toLowerCase() === this.user.bidang.toLowerCase());
+                        } else {
+                            this.jenisArsipOptions = this.klasifikasiOptions;
+                        }
+                    }
                 } else {
                     this.formData = { 
                         fileName: '', 
                         fileData: '', 
+                        noAgenda: '',
+                        kodeKlasifikasi: '',
                         sifatSurat: 'Biasa', 
                         keterangan: '',
                         jenisSurat: '',
                         noSurat: '',
-                        tglSurat: '',
+                        tglSurat: new Date().toISOString().substring(0, 10),
+                        tglTerima: type === 'naskah_masuk' ? new Date().toISOString().substring(0, 10) : '',
+                        instansi: '',
+                        perihal: '',
                         keperluan: '',
-                        tandaTangan: ''
+                        tandaTangan: '',
+                        bidang: (this.user && this.user.bidang !== 'Semua') ? this.user.bidang : '',
+                        buatKeluarOtomatis: false
                     };
-                    if (type === 'naskah_masuk') this.formModal.title = 'Input Naskah Masuk';
-                    if (type === 'naskah_keluar') this.formModal.title = 'Input Naskah Keluar';
-                    if (type === 'pengguna') this.formModal.title = 'Tambah Pengguna';
+                    
+                    if (type === 'naskah_masuk' || type === 'naskah_keluar') {
+                        if (this.user && this.user.bidang && this.user.bidang !== 'Semua') {
+                            this.jenisArsipOptions = this.klasifikasiOptions.filter(o => o.bidang.toLowerCase() === this.user.bidang.toLowerCase());
+                        } else {
+                            this.jenisArsipOptions = this.klasifikasiOptions;
+                        }
+                    }
+                    
+                    if (type === 'naskah_masuk') {
+                        this.formModal.title = 'Input Naskah Masuk';
+                        this.fetchNextNoAgenda('Masuk');
+                    }
+                    if (type === 'naskah_keluar') {
+                        this.formModal.title = 'Input Naskah Keluar';
+                        this.fetchNextNoAgenda('Keluar');
+                    }
+                    if (type === 'pengguna') {
+                        this.formModal.title = 'Tambah Pengguna';
+                        this.formData.role = 'Perangkat Desa';
+                        this.formData.bidang = 'Semua';
+                    }
                     if (type === 'bidang') this.formModal.title = 'Tambah Kategori Bidang';
                 }
                 this.formModal.show = true;
@@ -193,30 +306,55 @@
                                 this.showToast('Memproses dan mengunggah file...', 'info');
                             }
 
-                            google.script.run
-                                .withSuccessHandler((res) => {
-                                    this.handleResponse(res, 'Data naskah berhasil disimpan');
-                                })
-                                .withFailureHandler((err) => {
-                                    // Script-level failure (timeout/crash) — data may already be saved
-                                    this.isLoading = false;
-                                    this.formModal.show = false;
-                                    this.showToast('Data tersimpan. Catatan: ' + (err.message || 'Periksa kembali data Anda.'), 'info');
-                                    setTimeout(() => this.navigate(this.view), 500);
-                                })
-                                .saveArsipWithFile(
-                                    subType,
-                                    this.formData,
-                                    this.user.username,
-                                    this.formData.fileData || null,
-                                    this.formData.fileName || null
-                                );
+                            if (this.formModal.isEdit) {
+                                google.script.run
+                                    .withSuccessHandler((res) => {
+                                        this.handleResponse(res, 'Data naskah berhasil diperbarui');
+                                    })
+                                    .withFailureHandler((err) => {
+                                        this.isLoading = false;
+                                        this.showError(err.message || 'Gagal memperbarui naskah');
+                                    })
+                                    .updateArsipWithFile(
+                                        subType,
+                                        this.formModal.oldNoSurat,
+                                        this.formData,
+                                        this.user.username,
+                                        this.formData.fileData || null,
+                                        this.formData.fileName || null
+                                    );
+                            } else {
+                                google.script.run
+                                    .withSuccessHandler((res) => {
+                                        this.handleResponse(res, 'Data naskah berhasil disimpan');
+                                    })
+                                    .withFailureHandler((err) => {
+                                        this.isLoading = false;
+                                        this.formModal.show = false;
+                                        this.showToast('Data tersimpan. Catatan: ' + (err.message || 'Periksa kembali data Anda.'), 'info');
+                                        setTimeout(() => this.navigate(this.view), 500);
+                                    })
+                                    .saveArsipWithFile(
+                                        subType,
+                                        this.formData,
+                                        this.user.username,
+                                        this.formData.fileData || null,
+                                        this.formData.fileName || null
+                                    );
+                            }
 
                         } else if (type === 'pengguna') {
-                            google.script.run
-                                .withSuccessHandler((res) => { this.handleResponse(res, 'User baru berhasil ditambahkan'); })
-                                .withFailureHandler((err) => { this.isLoading = false; this.showError(err.message || 'Gagal menambahkan user'); })
-                                .saveUser(this.formData, this.user.username);
+                            if (this.formModal.isEdit) {
+                                google.script.run
+                                    .withSuccessHandler((res) => { this.handleResponse(res, 'User berhasil diperbarui'); })
+                                    .withFailureHandler((err) => { this.isLoading = false; this.showError(err.message || 'Gagal memperbarui user'); })
+                                    .updateUser(this.formModal.oldNama, this.formData, this.user.username);
+                            } else {
+                                google.script.run
+                                    .withSuccessHandler((res) => { this.handleResponse(res, 'User baru berhasil ditambahkan'); })
+                                    .withFailureHandler((err) => { this.isLoading = false; this.showError(err.message || 'Gagal menambahkan user'); })
+                                    .saveUser(this.formData, this.user.username);
+                            }
                         } else if (type === 'bidang') {
                             if (this.formModal.isEdit) {
                                 google.script.run
@@ -324,7 +462,6 @@
             autoLogin(role) {
                 this.username = role;
                 this.password = role;
-                this.rememberMe = 'no';
                 this.doLogin();
             },
 
@@ -350,20 +487,24 @@
                 if (!this.dashboardData) this.loadDashboard();
 
                 if (page === 'dashboard') this.loadDashboard();
-                if (page === 'naskah_masuk' || page === 'naskah_keluar') this.loadArsip();
+                if (page === 'naskah_masuk' || page === 'naskah_keluar' || page === 'detail_bidang') this.loadArsip();
                 if (page === 'pengguna') this.loadPengguna();
                 if (page === 'tracking') this.loadTracking();
                 if (page === 'bidang_dokumen') this.loadDashboard();
             },
 
             viewArsipBidang(bidangName) {
-                this.activeBidangFilter = bidangName;
-                this.navigate('naskah_masuk'); // Default to masuk
+                this.selectedBidang = bidangName;
+                this.bidangSearchQuery = '';
+                this.bidangJenisFilter = '';
+                this.bidangSifatFilter = '';
+                this.bidangStatusFilter = '';
+                this.navigate('detail_bidang');
             },
 
             loadDashboard() {
                 if (typeof google !== 'undefined' && google.script && google.script.run) {
-                    google.script.run.withSuccessHandler(data => this.dashboardData = data).getDashboardData();
+                    google.script.run.withSuccessHandler(data => this.dashboardData = data).getDashboardData(this.user?.username);
                 } else {
                     this.dashboardData = {
                         totalArsip: 550, totalBidang: 4, arsipAktif: 400, arsipInaktif: 150, bidangList: [
@@ -378,11 +519,11 @@
 
             loadArsip() {
                 if (typeof google !== 'undefined' && google.script && google.script.run) {
-                    google.script.run.withSuccessHandler(data => this.arsipData = data).getArsipData();
+                    google.script.run.withSuccessHandler(data => this.arsipData = data).getArsipData(this.user?.username);
                 } else {
                     this.arsipData = [
-                        { jenis: 'Masuk', noIndeks: '001', noSurat: '470/01/DS/2023', perihal: 'Permohonan Akte Lahir', bidang: 'Kependudukan', tglSurat: '01-10-2023', sifatSurat: 'Biasa', asalInstansi: 'Warga' },
-                        { jenis: 'Keluar', noIndeks: '002', noSurat: '590/12/DS/2023', perihal: 'Sertifikat Tanah Desa', bidang: 'Umum', tglSurat: '05-10-2023', sifatSurat: 'Penting', tujuanInstansi: 'BPN' }
+                        { jenis: 'Masuk', noIndeks: '001', noSurat: '470/01/DS/2023', perihal: 'Permohonan Akte Lahir', bidang: 'Kependudukan', tglSurat: '01-10-2023', sifatSurat: 'Biasa', asalInstansi: 'Warga', statusArsip: 'Aktif' },
+                        { jenis: 'Keluar', noIndeks: '002', noSurat: '590/12/DS/2023', perihal: 'Sertifikat Tanah Desa', bidang: 'Umum', tglSurat: '05-10-2023', sifatSurat: 'Penting', tujuanInstansi: 'BPN', statusArsip: 'Aktif' }
                     ];
                 }
             },
@@ -392,8 +533,8 @@
                     google.script.run.withSuccessHandler(data => this.usersData = data).getUsers();
                 } else {
                     this.usersData = [
-                        { id: 1, username: 'admin', role: 'Admin', status: 'Aktif' },
-                        { id: 2, username: 'user', role: 'Perangkat Desa', status: 'Aktif' }
+                        { id: 1, username: 'admin', password: 'admin', role: 'Admin', status: 'Aktif', bidang: 'Semua' },
+                        { id: 2, username: 'user', password: 'user', role: 'Perangkat Desa', status: 'Aktif', bidang: 'Pemerintahan' }
                     ];
                 }
             },
@@ -429,6 +570,189 @@
                     }).downloadDataZip(this.user?.username || 'admin', this.filterDownload.startDate, this.filterDownload.endDate);
                 } else {
                     setTimeout(() => this.showToast('Simulasi: ZIP berhasil didownload', 'success'), 1500);
+                }
+            },
+
+            // ----------------------------------------------------
+            // Helper Admin Pengguna & Hapus
+            // ----------------------------------------------------
+            async confirmDeleteUser(u) {
+                if (u.username === this.user.username) {
+                    return this.showToast('Tidak dapat menghapus akun Anda sendiri yang sedang aktif!', 'error');
+                }
+                if (confirm(`Apakah Anda yakin ingin menghapus pengguna "${u.username}"?`)) {
+                    this.isLoading = true;
+                    if (typeof google !== 'undefined' && google.script && google.script.run) {
+                        google.script.run
+                            .withSuccessHandler((res) => {
+                                this.isLoading = false;
+                                if (res.success) {
+                                    this.showToast('Pengguna berhasil dihapus', 'success');
+                                    this.loadPengguna();
+                                } else {
+                                    this.showError(res.message);
+                                }
+                            })
+                            .withFailureHandler((err) => {
+                                this.isLoading = false;
+                                this.showError(err.message || 'Gagal menghapus pengguna');
+                            })
+                            .deleteUser(u.username, this.user.username);
+                    } else {
+                        setTimeout(() => {
+                            this.isLoading = false;
+                            this.showToast('Simulasi: Pengguna dihapus', 'success');
+                            this.loadPengguna();
+                        }, 1000);
+                    }
+                }
+            },
+
+            // ----------------------------------------------------
+            // Helper Notifikasi
+            // ----------------------------------------------------
+            loadNotifications() {
+                if (this.user && typeof google !== 'undefined' && google.script && google.script.run) {
+                    google.script.run
+                        .withSuccessHandler(data => {
+                            const oldUnreadCount = this.unreadNotificationsCount;
+                            this.notifications = data;
+                            const newUnreadCount = this.unreadNotificationsCount;
+                            if (newUnreadCount > oldUnreadCount && oldUnreadCount > 0) {
+                                this.showToast('Ada notifikasi baru masuk!', 'info');
+                            }
+                        })
+                        .getNotifications(this.user.username);
+                }
+            },
+
+            readAllNotifications() {
+                if (this.unreadNotificationsCount === 0) return;
+                this.notifications.forEach(n => n.status = 'Dibaca'); // optimistic update
+                if (this.user && typeof google !== 'undefined' && google.script && google.script.run) {
+                    google.script.run
+                        .withSuccessHandler(() => this.loadNotifications())
+                        .markNotificationsAsRead(this.user.username);
+                }
+            },
+
+            // ----------------------------------------------------
+            // Helper Retensi Surat
+            // ----------------------------------------------------
+            async changeStatus(arsip, newStatus) {
+                if (arsip.statusArsip === newStatus) return;
+                const originalStatus = arsip.statusArsip;
+                arsip.statusArsip = newStatus; // optimistic update
+                
+                if (typeof google !== 'undefined' && google.script && google.script.run) {
+                    google.script.run
+                        .withSuccessHandler((res) => {
+                            if (res.success) {
+                                this.showToast(`Status naskah berhasil diubah menjadi ${newStatus}`, 'success');
+                                this.loadDashboard(); // update counts
+                            } else {
+                                arsip.statusArsip = originalStatus; // rollback
+                                this.showError(res.message);
+                            }
+                        })
+                        .withFailureHandler((err) => {
+                            arsip.statusArsip = originalStatus; // rollback
+                            this.showError(err.message || 'Gagal mengubah status naskah');
+                        })
+                        .setArsipStatus(arsip.jenis, arsip.noSurat, newStatus, this.user.username);
+                } else {
+                    setTimeout(() => {
+                        this.showToast(`Simulasi: Status naskah diubah menjadi ${newStatus}`, 'success');
+                        this.loadDashboard();
+                    }, 500);
+                }
+            },
+
+            // ----------------------------------------------------
+            // Helper Agenda & Klasifikasi Otomatis
+            // ----------------------------------------------------
+            fetchNextNoAgenda(type) {
+                if (typeof google !== 'undefined' && google.script && google.script.run) {
+                    google.script.run
+                        .withSuccessHandler(code => {
+                            this.formData.noAgenda = code;
+                        })
+                        .getNextNoAgenda(type);
+                } else {
+                    const seq = (this.arsipData.filter(a => a.jenis === type).length + 1).toString().padStart(3, '0');
+                    const code = type === 'Masuk' ? 'SM' : 'SK';
+                    this.formData.noAgenda = `${seq}/${code}/05/2026`;
+                }
+            },
+
+            loadKlasifikasiOptions() {
+                if (typeof google !== 'undefined' && google.script && google.script.run) {
+                    google.script.run
+                        .withSuccessHandler(data => {
+                            this.klasifikasiOptions = data;
+                        })
+                        .getKlasifikasiOptions();
+                } else {
+                    this.klasifikasiOptions = [
+                        { bidang: 'Pemerintahan', kode: 'PEM.01', jenisArsip: 'Surat Umum' },
+                        { bidang: 'Pemerintahan', kode: 'PEM.02', jenisArsip: 'Sosialisasi dan Undangan' },
+                        { bidang: 'Kesejahteraan', kode: 'KES.01', jenisArsip: 'Perkawinan' },
+                        { bidang: 'Kesejahteraan', kode: 'KES.02', jenisArsip: 'Kesejahteraan Sosial' },
+                        { bidang: 'Kependudukan', kode: 'KEP.01', jenisArsip: 'Pindah Keluar / Masuk' },
+                        { bidang: 'Kependudukan', kode: 'KEP.02', jenisArsip: 'Kematian / Akte Kematian' },
+                        { bidang: 'Kependudukan', kode: 'KEP.03', jenisArsip: 'Kelahiran / Akte Lahir' },
+                        { bidang: 'Kependudukan', kode: 'KEP.04', jenisArsip: 'Pembuatan / Perubahan KK' },
+                        { bidang: 'Pertanahan', kode: 'PER.01', jenisArsip: 'Mutasi Tanah (Jual beli / waris/ hibah)' },
+                        { bidang: 'Pertanahan', kode: 'PER.02', jenisArsip: 'Mutasi PBB' },
+                        { bidang: 'Pertanahan', kode: 'PER.03', jenisArsip: 'Keterangan Tanah Lainnya' },
+                        { bidang: 'Umum', kode: 'UMU.01', jenisArsip: 'Surat Lainnya' }
+                    ];
+                }
+            },
+
+            onBidangChange() {
+                if (this.formData.bidang) {
+                    if (this.user && this.user.bidang && this.user.bidang !== 'Semua') {
+                        this.jenisArsipOptions = this.klasifikasiOptions.filter(o => o.bidang.toLowerCase() === this.user.bidang.toLowerCase());
+                    } else {
+                        this.jenisArsipOptions = this.klasifikasiOptions.filter(o => o.bidang.toLowerCase() === this.formData.bidang.toLowerCase());
+                    }
+                } else {
+                    if (this.user && this.user.bidang && this.user.bidang !== 'Semua') {
+                        this.jenisArsipOptions = this.klasifikasiOptions.filter(o => o.bidang.toLowerCase() === this.user.bidang.toLowerCase());
+                    } else {
+                        this.jenisArsipOptions = this.klasifikasiOptions;
+                    }
+                }
+                if (!this.formModal.isEdit) {
+                    this.formData.jenisSurat = '';
+                    this.formData.kodeKlasifikasi = '';
+                    this.formData.noSurat = '';
+                }
+            },
+
+            onJenisSuratChange() {
+                if (this.formData.jenisSurat) {
+                    const option = this.klasifikasiOptions.find(o => o.jenisArsip.toLowerCase() === this.formData.jenisSurat.toLowerCase());
+                    if (option) {
+                        this.formData.bidang = option.bidang;
+                        this.formData.kodeKlasifikasi = option.kode; // Base classification code (e.g., PEM.01)
+                        if (typeof google !== 'undefined' && google.script && google.script.run) {
+                            google.script.run
+                                .withSuccessHandler(code => {
+                                    this.formData.noSurat = code; // Dynamic sequence code (e.g., PEM.01.01)
+                                })
+                                .getNextKodeKlasifikasi(option.bidang, this.formData.jenisSurat);
+                        } else {
+                            this.formData.noSurat = `${option.kode}.01`;
+                        }
+                    }
+                } else {
+                    if (!this.formModal.isEdit) {
+                        this.formData.kodeKlasifikasi = '';
+                        this.formData.noSurat = '';
+                        this.formData.bidang = '';
+                    }
                 }
             }
         }));
