@@ -457,18 +457,223 @@ function getUsers() {
   }
 }
 
-function downloadDataArsip(username, startDate, endDate) {
-  let detail = 'Mendownload rekap data arsip format Excel';
-  if (startDate && endDate) detail += ` (${startDate} s/d ${endDate})`;
-  logActivity(username || 'Sistem', 'Download Excel', detail);
-  return "https://docs.google.com/spreadsheets/d/" + SPREADSHEET_ID + "/export?format=xlsx";
+// Helper untuk mem-parse tanggal secara fleksibel dari berbagai tipe (Date object atau String)
+function parseDate(val) {
+  if (!val) return null;
+  if (val instanceof Date) {
+    return new Date(val.getFullYear(), val.getMonth(), val.getDate());
+  }
+  const str = val.toString().trim();
+  if (!str || str === '-') return null;
+  
+  // Format yyyy-mm-dd
+  let parts = str.split('-');
+  if (parts.length === 3) {
+    if (parts[0].length === 4) { // yyyy-mm-dd
+      return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    } else if (parts[2].length === 4) { // dd-mm-yyyy
+      return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+    }
+  }
+  
+  // Format dd/mm/yyyy atau yyyy/mm/dd
+  parts = str.split('/');
+  if (parts.length === 3) {
+    if (parts[0].length === 4) { // yyyy/mm/dd
+      return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    } else if (parts[2].length === 4) { // dd/mm/yyyy
+      return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+    }
+  }
+  
+  const parsed = Date.parse(str);
+  if (!isNaN(parsed)) {
+    const d = new Date(parsed);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+  return null;
 }
 
-function downloadDataZip(username, startDate, endDate) {
-  let detail = 'Mencoba download ZIP arsip (Redirect ke Spreadsheet)';
-  if (startDate && endDate) detail += ` (${startDate} s/d ${endDate})`;
-  logActivity(username || 'Sistem', 'Download ZIP', detail);
-  return "https://docs.google.com/spreadsheets/d/" + SPREADSHEET_ID + "/export?format=xlsx";
+// Membersihkan berkas spreadsheet rekap temp yang berumur lebih dari 10 menit
+function cleanupTempFiles() {
+  try {
+    const threshold = new Date(Date.now() - 10 * 60 * 1000); // 10 menit lalu
+    const files = DriveApp.searchFiles("title contains 'SIPATIH_TEMP_REKAP_' and mimeType = '" + MimeType.GOOGLE_SHEETS + "'");
+    while (files.hasNext()) {
+      const file = files.next();
+      if (file.getLastUpdated() < threshold) {
+        file.setTrashed(true);
+        console.log('Menghapus file temp rekap lama: ' + file.getName());
+      }
+    }
+  } catch (e) {
+    console.error('Error saat membersihkan file temp: ' + e.message);
+  }
+}
+
+function downloadDataArsip(username, startDate, endDate) {
+  try {
+    // 1. Bersihkan file temp lama
+    cleanupTempFiles();
+    
+    const ss = getSS();
+    
+    // 2. Cek izin bidang user
+    let userBidang = "Semua";
+    let userRole = "Admin";
+    if (username) {
+      const uSheet = ss.getSheetByName('Pengguna');
+      if (uSheet && uSheet.getLastRow() > 1) {
+        const uData = uSheet.getRange(2, 2, uSheet.getLastRow() - 1, 5).getValues();
+        for (let i = 0; i < uData.length; i++) {
+          if (uData[i][0] === username) {
+            userRole = uData[i][2];
+            userBidang = uData[i][4] || "Semua";
+            break;
+          }
+        }
+      }
+    }
+    
+    // Parse tanggal batas jika ada
+    const startLimit = startDate ? parseDate(startDate) : null;
+    const endLimit = endDate ? parseDate(endDate) : null;
+    
+    if (startLimit) startLimit.setHours(0, 0, 0, 0);
+    if (endLimit) endLimit.setHours(23, 59, 59, 999);
+    
+    // 3. Tarik & Filter Naskah Masuk
+    const masukSheet = ss.getSheetByName('Naskah Masuk');
+    const masukDataFiltered = [];
+    let masukHeaders = [];
+    if (masukSheet && masukSheet.getLastRow() > 0) {
+      const allRows = masukSheet.getDataRange().getValues();
+      masukHeaders = allRows[0];
+      const dataRows = allRows.slice(1);
+      
+      dataRows.forEach(row => {
+        if (!row[0] && !row[3]) return; // Lewati baris kosong
+        
+        // Filter Bidang
+        const b = row[9] ? row[9].toString().trim() : "";
+        if (userRole !== "Admin" && userRole !== "Kepala Desa" && userBidang !== "Semua" && b !== userBidang) {
+          return; // Bidang tidak cocok
+        }
+        
+        // Filter Tanggal Surat (row[4] is Tanggal Surat)
+        const docDate = parseDate(row[4]);
+        if (docDate) {
+          if (startLimit && docDate.getTime() < startLimit.getTime()) return;
+          if (endLimit && docDate.getTime() > endLimit.getTime()) return;
+        } else if (startLimit || endLimit) {
+          return; // Jika ada filter tanggal tapi tanggal surat kosong, lewati
+        }
+        
+        // Format object Date kembali menjadi string/nilai yang bagus untuk excel
+        const formattedRow = row.map((cell, idx) => {
+          if (cell instanceof Date) {
+            return Utilities.formatDate(cell, 'Asia/Jakarta', 'yyyy-MM-dd');
+          }
+          return cell;
+        });
+        
+        masukDataFiltered.push(formattedRow);
+      });
+    }
+    
+    // 4. Tarik & Filter Naskah Keluar
+    const keluarSheet = ss.getSheetByName('Naskah Keluar');
+    const keluarDataFiltered = [];
+    let keluarHeaders = [];
+    if (keluarSheet && keluarSheet.getLastRow() > 0) {
+      const allRows = keluarSheet.getDataRange().getValues();
+      keluarHeaders = allRows[0];
+      const dataRows = allRows.slice(1);
+      
+      dataRows.forEach(row => {
+        if (!row[0] && !row[3]) return; // Lewati baris kosong
+        
+        // Filter Bidang
+        const b = row[8] ? row[8].toString().trim() : "";
+        if (userRole !== "Admin" && userRole !== "Kepala Desa" && userBidang !== "Semua" && b !== userBidang) {
+          return; // Bidang tidak cocok
+        }
+        
+        // Filter Tanggal Surat (row[4] is Tanggal Surat)
+        const docDate = parseDate(row[4]);
+        if (docDate) {
+          if (startLimit && docDate.getTime() < startLimit.getTime()) return;
+          if (endLimit && docDate.getTime() > endLimit.getTime()) return;
+        } else if (startLimit || endLimit) {
+          return; // Jika ada filter tanggal tapi tanggal surat kosong, lewati
+        }
+        
+        // Format object Date kembali
+        const formattedRow = row.map((cell, idx) => {
+          if (cell instanceof Date) {
+            return Utilities.formatDate(cell, 'Asia/Jakarta', 'yyyy-MM-dd');
+          }
+          return cell;
+        });
+        
+        keluarDataFiltered.push(formattedRow);
+      });
+    }
+    
+    // 5. Buat Spreadsheet Temp Baru
+    const timestampStr = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyyMMdd_HHmmss');
+    const tempFileName = "SIPATIH_TEMP_REKAP_" + timestampStr;
+    const tempSS = SpreadsheetApp.create(tempFileName);
+    
+    // Tulis Naskah Masuk
+    const tempMasukSheet = tempSS.getActiveSheet();
+    tempMasukSheet.setName("Naskah Masuk");
+    if (masukHeaders.length > 0) {
+      tempMasukSheet.appendRow(masukHeaders);
+      if (masukDataFiltered.length > 0) {
+        tempMasukSheet.getRange(2, 1, masukDataFiltered.length, masukHeaders.length).setValues(masukDataFiltered);
+      }
+      tempMasukSheet.autoResizeColumns(1, masukHeaders.length);
+    }
+    
+    // Tulis Naskah Keluar
+    if (keluarHeaders.length > 0) {
+      const tempKeluarSheet = tempSS.insertSheet("Naskah Keluar");
+      tempKeluarSheet.appendRow(keluarHeaders);
+      if (keluarDataFiltered.length > 0) {
+        tempKeluarSheet.getRange(2, 1, keluarDataFiltered.length, keluarHeaders.length).setValues(keluarDataFiltered);
+      }
+      tempKeluarSheet.autoResizeColumns(1, keluarHeaders.length);
+    }
+    
+    // 6. Set Sharing file agar bisa diunduh
+    try {
+      const file = DriveApp.getFileById(tempSS.getId());
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    } catch (sharingErr) {
+      console.warn("Gagal setSharing pada spreadsheet temp: " + sharingErr.message);
+    }
+    
+    // 7. Log Aktivitas
+    let detail = 'Mendownload rekap data arsip format Excel';
+    if (startDate && endDate) {
+      detail += ` (${startDate} s/d ${endDate})`;
+    } else if (startDate) {
+      detail += ` (Mulai ${startDate})`;
+    } else if (endDate) {
+      detail += ` (Hingga ${endDate})`;
+    }
+    detail += ` - Berhasil memfilter ${masukDataFiltered.length} Naskah Masuk & ${keluarDataFiltered.length} Naskah Keluar.`;
+    
+    logActivity(username || 'Sistem', 'Download Excel', detail);
+    
+    // 8. Kembalikan URL export
+    return "https://docs.google.com/spreadsheets/d/" + tempSS.getId() + "/export?format=xlsx";
+    
+  } catch (e) {
+    console.error("Error pada downloadDataArsip: " + e.message);
+    throw new Error("Gagal membuat rekap Excel: " + e.message);
+  }
 }
 
 // ----------------------------------------------------

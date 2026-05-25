@@ -76,15 +76,65 @@
                     class="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl text-sm font-medium btn-hover shadow-lg shadow-emerald-100">
                     <i class="fas fa-file-excel"></i> Download Excel
                 </button>
-                <button @click="downloadZip()"
-                    class="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-5 py-2.5 rounded-xl text-sm font-medium btn-hover shadow-lg shadow-amber-100">
-                    <i class="fas fa-file-archive"></i> Download ZIP
-                </button>
             </div>
         </div>
         <p class="text-gray-500 text-sm">Unduh seluruh data arsip untuk keperluan rekapitulasi,
-            pelaporan, atau backup (Spreadsheet & ZIP Kompresi). Kosongkan rentang tanggal untuk
+            pelaporan, atau backup (Spreadsheet Excel). Kosongkan rentang tanggal untuk
             mengunduh semua data.</p>
+
+        <!-- Preview Dokumen Terfilter -->
+        <div x-cloak x-show="filteredDownloadArsip.length > 0" class="mt-6 bg-gray-50/50 border border-gray-100 rounded-2xl p-6 transition-all duration-300">
+            <div class="flex justify-between items-center mb-4">
+                <h4 class="text-sm font-bold text-gray-700 flex items-center gap-2">
+                    <i class="fas fa-list-ul text-emerald-600"></i>
+                    Preview Dokumen Terfilter (<span x-text="filteredDownloadArsip.length"></span>)
+                </h4>
+            </div>
+            <div class="max-h-60 overflow-y-auto divide-y divide-gray-100 bg-white rounded-xl border border-gray-100 shadow-sm no-scrollbar">
+                <template x-for="arsip in filteredDownloadArsip" :key="arsip.noIndeks + arsip.noSurat">
+                    <div class="p-4 hover:bg-gray-50/80 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-3">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2.5 flex-wrap mb-1.5">
+                                <span class="px-2 py-0.5 text-[10px] font-bold rounded-lg uppercase"
+                                    :class="arsip.jenis === 'Masuk' ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'bg-indigo-50 text-indigo-700 border border-indigo-100'"
+                                    x-text="arsip.jenis"></span>
+                                
+                                <span class="text-xs font-bold text-gray-500" x-text="arsip.noSurat"></span>
+                                <span class="text-[10px] text-gray-400 font-semibold" x-text="arsip.tglSurat"></span>
+                                
+                                <span class="px-2 py-0.5 text-[10px] font-bold rounded-lg"
+                                    :class="arsip.sifatSurat === 'Penting' ? 'bg-red-50 text-red-600' : (arsip.sifatSurat === 'Rahasia' ? 'bg-purple-50 text-purple-600' : 'bg-emerald-50 text-emerald-600')"
+                                    x-text="arsip.sifatSurat"></span>
+                            </div>
+                            <h5 class="text-sm font-semibold text-gray-800 truncate" x-text="arsip.perihal"></h5>
+                            <p class="text-xs text-gray-400 mt-1 truncate">
+                                Bidang: <span class="font-semibold text-gray-600" x-text="arsip.bidang"></span> 
+                                | <span x-text="arsip.jenis === 'Masuk' ? 'Pengirim: ' : 'Penerima: '"></span>
+                                <span class="font-semibold text-gray-600" x-text="arsip.jenis === 'Masuk' ? (arsip.asalInstansi || '-') : (arsip.tujuanInstansi || '-')"></span>
+                            </p>
+                        </div>
+                        <div class="flex items-center gap-2 self-end md:self-center">
+                            <button @click="openPreview(arsip)" title="Lihat Dokumen"
+                                class="text-emerald-600 hover:bg-emerald-50 w-8 h-8 rounded-lg transition-all inline-flex items-center justify-center border border-emerald-100">
+                                <i class="fas fa-eye text-sm"></i>
+                            </button>
+                            <a :href="arsip.linkFile" target="_blank" title="Unduh File"
+                                class="text-teal-600 hover:bg-teal-50 w-8 h-8 rounded-lg transition-all inline-flex items-center justify-center border border-teal-100">
+                                <i class="fas fa-download text-sm"></i>
+                            </a>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+        
+        <!-- Empty State ketika filter tidak membuahkan hasil -->
+        <div x-cloak x-show="(filterDownload.startDate || filterDownload.endDate) && filteredDownloadArsip.length === 0" 
+             class="mt-6 bg-red-50/30 border border-dashed border-red-200 rounded-2xl p-8 text-center">
+            <i class="fas fa-folder-open text-3xl text-red-300 mb-2 opacity-50"></i>
+            <p class="text-sm font-semibold text-red-700">Tidak ada dokumen ditemukan pada tanggal tersebut</p>
+            <p class="text-xs text-red-500 mt-1">Silakan sesuaikan tanggal mulai dan tanggal akhir.</p>
+        </div>
     </div>
 
     <!-- Copyright -->

@@ -116,6 +116,35 @@
                 return data;
             },
 
+            get filteredDownloadArsip() {
+                const startStr = this.filterDownload.startDate;
+                const endStr = this.filterDownload.endDate;
+                
+                if (!startStr && !endStr) {
+                    return [];
+                }
+                
+                let start = startStr ? new Date(startStr) : null;
+                if (start) start.setHours(0, 0, 0, 0);
+                
+                let end = endStr ? new Date(endStr) : null;
+                if (end) end.setHours(23, 59, 59, 999);
+                
+                return this.arsipData.filter(a => {
+                    if (!a.tglSurat || a.tglSurat === '-') return false;
+                    
+                    // Parse "dd-MM-yyyy"
+                    const parts = a.tglSurat.split('-');
+                    if (parts.length !== 3) return false;
+                    const docDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+                    docDate.setHours(0, 0, 0, 0);
+                    
+                    if (start && docDate.getTime() < start.getTime()) return false;
+                    if (end && docDate.getTime() > end.getTime()) return false;
+                    return true;
+                });
+            },
+
             init() {
                 this.checkSession();
                 this.loadKlasifikasiOptions();
@@ -579,23 +608,17 @@
                 this.showToast('Menyiapkan file Excel...', 'info');
                 if (typeof google !== 'undefined' && google.script && google.script.run) {
                     google.script.run.withSuccessHandler(url => {
-                        window.open(url, '_blank');
+                        // Gunakan tag anchor tersembunyi untuk mendownload langsung tanpa terblokir oleh popup blocker
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.style.display = 'none';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
                         this.showToast('Download dimulai', 'success');
                     }).downloadDataArsip(this.user?.username || 'admin', this.filterDownload.startDate, this.filterDownload.endDate);
                 } else {
                     setTimeout(() => this.showToast('Simulasi: Excel berhasil didownload', 'success'), 1000);
-                }
-            },
-
-            downloadZip() {
-                this.showToast('Menyiapkan paket ZIP...', 'info');
-                if (typeof google !== 'undefined' && google.script && google.script.run) {
-                    google.script.run.withSuccessHandler(url => {
-                        window.open(url, '_blank');
-                        this.showToast('Download ZIP dimulai', 'success');
-                    }).downloadDataZip(this.user?.username || 'admin', this.filterDownload.startDate, this.filterDownload.endDate);
-                } else {
-                    setTimeout(() => this.showToast('Simulasi: ZIP berhasil didownload', 'success'), 1500);
                 }
             },
 
