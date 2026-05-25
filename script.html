@@ -54,20 +54,22 @@
                 if (this.user && this.user.role !== 'Admin' && this.user.role !== 'Kepala Desa') {
                     const uBidang = this.user.bidang;
                     if (uBidang && uBidang !== 'Semua') {
-                        data = data.filter(a => a.bidang === uBidang);
+                        data = data.filter(a => a.bidang && a.bidang.toString().toLowerCase() === uBidang.toString().toLowerCase());
                     }
                 }
                 if (this.activeBidangFilter) {
-                    data = data.filter(a => a.bidang === this.activeBidangFilter);
+                    data = data.filter(a => a.bidang && a.bidang.toString().toLowerCase() === this.activeBidangFilter.toString().toLowerCase());
                 }
                 if (this.searchQuery) {
                     const q = this.searchQuery.toLowerCase();
                     data = data.filter(a => 
-                        (a.noSurat && a.noSurat.toLowerCase().includes(q)) ||
-                        (a.perihal && a.perihal.toLowerCase().includes(q)) ||
-                        (a.asalInstansi && a.asalInstansi.toLowerCase().includes(q)) ||
-                        (a.tujuanInstansi && a.tujuanInstansi.toLowerCase().includes(q)) ||
-                        (a.keterangan && a.keterangan.toLowerCase().includes(q))
+                        (a.noSurat && a.noSurat.toString().toLowerCase().includes(q)) ||
+                        (a.perihal && a.perihal.toString().toLowerCase().includes(q)) ||
+                        (a.instansi && a.instansi.toString().toLowerCase().includes(q)) ||
+                        (a.asalInstansi && a.asalInstansi.toString().toLowerCase().includes(q)) ||
+                        (a.tujuanInstansi && a.tujuanInstansi.toString().toLowerCase().includes(q)) ||
+                        (a.keterangan && a.keterangan.toString().toLowerCase().includes(q)) ||
+                        (a.noAgenda && a.noAgenda.toString().toLowerCase().includes(q))
                     );
                 }
                 return data;
@@ -78,7 +80,7 @@
                 
                 // Filter by selected Bidang
                 if (this.selectedBidang) {
-                    data = data.filter(a => a.bidang.toLowerCase() === this.selectedBidang.toLowerCase());
+                    data = data.filter(a => a.bidang && a.bidang.toString().toLowerCase() === this.selectedBidang.toString().toLowerCase());
                 }
                 
                 // Filter by Jenis (Masuk / Keluar)
@@ -100,12 +102,14 @@
                 if (this.bidangSearchQuery) {
                     const q = this.bidangSearchQuery.toLowerCase();
                     data = data.filter(a => 
-                        (a.noSurat && a.noSurat.toLowerCase().includes(q)) ||
-                        (a.perihal && a.perihal.toLowerCase().includes(q)) ||
-                        (a.instansi && a.instansi.toLowerCase().includes(q)) ||
-                        (a.noAgenda && a.noAgenda.toLowerCase().includes(q)) ||
-                        (a.jenisSurat && a.jenisSurat.toLowerCase().includes(q)) ||
-                        (a.keterangan && a.keterangan.toLowerCase().includes(q))
+                        (a.noSurat && a.noSurat.toString().toLowerCase().includes(q)) ||
+                        (a.perihal && a.perihal.toString().toLowerCase().includes(q)) ||
+                        (a.instansi && a.instansi.toString().toLowerCase().includes(q)) ||
+                        (a.asalInstansi && a.asalInstansi.toString().toLowerCase().includes(q)) ||
+                        (a.tujuanInstansi && a.tujuanInstansi.toString().toLowerCase().includes(q)) ||
+                        (a.noAgenda && a.noAgenda.toString().toLowerCase().includes(q)) ||
+                        (a.jenisSurat && a.jenisSurat.toString().toLowerCase().includes(q)) ||
+                        (a.keterangan && a.keterangan.toString().toLowerCase().includes(q))
                     );
                 }
                 
