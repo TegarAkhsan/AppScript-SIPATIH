@@ -117,34 +117,78 @@
             },
 
             get filteredDownloadArsip() {
-                const startStr = this.filterDownload.startDate;
-                const endStr = this.filterDownload.endDate;
+                let startStr = this.filterDownload.startDate;
+                let endStr = this.filterDownload.endDate;
                 
                 if (!startStr && !endStr) {
                     return [];
                 }
                 
-                let startVal = 0;
-                if (startStr) {
-                    startVal = parseInt(startStr.replace(/-/g, ''), 10);
+                // Implement single-day fallback logic
+                if (startStr && !endStr) {
+                    endStr = startStr;
+                } else if (endStr && !startStr) {
+                    startStr = endStr;
                 }
                 
-                let endVal = 99999999;
-                if (endStr) {
-                    endVal = parseInt(endStr.replace(/-/g, ''), 10);
-                }
+                // Helper to format any date into yyyy-MM-dd string on the client side
+                const toISOFormat = (val) => {
+                    if (!val) return "";
+                    
+                    // If it is a Date object or has getMonth
+                    if (val instanceof Date || (val && typeof val.getMonth === 'function')) {
+                        const y = val.getFullYear();
+                        const m = String(val.getMonth() + 1).padStart(2, '0');
+                        const d = String(val.getDate()).padStart(2, '0');
+                        return `${y}-${m}-${d}`;
+                    }
+                    
+                    let str = val.toString().trim();
+                    if (!str || str === '-') return "";
+                    
+                    // If ISO format (contains 'T'), take only the date part (YYYY-MM-DD)
+                    if (str.indexOf('T') !== -1) {
+                        str = str.substring(0, 10);
+                    }
+                    
+                    // Try to match standard formats like yyyy-MM-dd or dd-MM-yyyy (using dash/slash/dot)
+                    let parts = str.split(/[-/.]/);
+                    if (parts.length === 3) {
+                        const p0 = parts[0].trim();
+                        const p1 = parts[1].trim();
+                        const p2 = parts[2].trim();
+                        
+                        if (p0.length === 4) { // yyyy-MM-dd
+                            return `${p0}-${p1.padStart(2, '0')}-${p2.padStart(2, '0')}`;
+                        } else if (p2.length === 4) { // dd-MM-yyyy
+                            return `${p2}-${p1.padStart(2, '0')}-${p0.padStart(2, '0')}`;
+                        }
+                    }
+                    
+                    // Standard JS Date parsing as fallback
+                    const parsed = Date.parse(str);
+                    if (!isNaN(parsed)) {
+                        const d = new Date(parsed);
+                        const y = d.getFullYear();
+                        const m = String(d.getMonth() + 1).padStart(2, '0');
+                        const day = String(d.getDate()).padStart(2, '0');
+                        return `${y}-${m}-${day}`;
+                    }
+                    
+                    return "";
+                };
+                
+                const filterStart = toISOFormat(startStr);
+                const filterEnd = toISOFormat(endStr);
                 
                 return this.arsipData.filter(a => {
-                    if (!a.tglSurat || a.tglSurat === '-') return false;
-                    
-                    // Parse "dd-MM-yyyy"
-                    const parts = a.tglSurat.split('-');
-                    if (parts.length !== 3) return false;
-                    
-                    // Konversi "dd-MM-yyyy" ke YYYYMMDD integer
-                    const docVal = parseInt(parts[2] + parts[1].padStart(2, '0') + parts[0].padStart(2, '0'), 10);
-                    
-                    return docVal >= startVal && docVal <= endVal;
+                    const docDateStr = toISOFormat(a.tglSurat);
+                    if (docDateStr) {
+                        if (filterStart && docDateStr < filterStart) return false;
+                        if (filterEnd && docDateStr > filterEnd) return false;
+                        return true;
+                    }
+                    return false; // Skip if date is empty or invalid
                 });
             },
 
@@ -565,7 +609,10 @@
 
             loadDashboard() {
                 if (typeof google !== 'undefined' && google.script && google.script.run) {
-                    google.script.run.withSuccessHandler(data => this.dashboardData = data).getDashboardData(this.user?.username);
+                    google.script.run
+                        .withSuccessHandler(data => this.dashboardData = data)
+                        .withFailureHandler(err => console.error("Error loadDashboard:", err))
+                        .getDashboardData(this.user?.username);
                 } else {
                     this.dashboardData = {
                         totalArsip: 550, totalBidang: 4, arsipAktif: 400, arsipInaktif: 150, bidangList: [
@@ -580,7 +627,10 @@
 
             loadArsip() {
                 if (typeof google !== 'undefined' && google.script && google.script.run) {
-                    google.script.run.withSuccessHandler(data => this.arsipData = data).getArsipData(this.user?.username);
+                    google.script.run
+                        .withSuccessHandler(data => this.arsipData = data)
+                        .withFailureHandler(err => console.error("Error loadArsip:", err))
+                        .getArsipData(this.user?.username);
                 } else {
                     this.arsipData = [
                         { jenis: 'Masuk', noIndeks: '001', noSurat: '470/01/DS/2023', perihal: 'Permohonan Akte Lahir', bidang: 'Kependudukan', tglSurat: '01-10-2023', sifatSurat: 'Biasa', asalInstansi: 'Warga', statusArsip: 'Aktif' },

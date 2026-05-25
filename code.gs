@@ -329,6 +329,57 @@ function getDashboardData(username) {
   }
 }
 
+// Helper untuk memformat objek Date atau String tanggal menjadi format string dd-MM-yyyy secara aman pada backend
+function formatDateToString(val) {
+  if (!val) return '-';
+  
+  // Jika ini adalah objek Date (atau bertipe objek dengan getMonth)
+  if (val instanceof Date || (val && typeof val === 'object' && typeof val.getMonth === 'function')) {
+    try {
+      return Utilities.formatDate(val, 'Asia/Jakarta', 'dd-MM-yyyy');
+    } catch(err) {
+      // Fallback manual jika Utilities.formatDate gagal
+      const y = val.getFullYear();
+      const m = String(val.getMonth() + 1).padStart(2, '0');
+      const d = String(val.getDate()).padStart(2, '0');
+      return `${d}-${m}-${y}`;
+    }
+  }
+  
+  const str = val.toString().trim();
+  if (!str || str === '-') return '-';
+  
+  // Jika formatnya ISO (mengandung T), kita parsing ke Date dulu lalu format ke dd-MM-yyyy
+  if (str.indexOf('T') !== -1) {
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) {
+      try {
+        return Utilities.formatDate(d, 'Asia/Jakarta', 'dd-MM-yyyy');
+      } catch(err) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${day}-${m}-${y}`;
+      }
+    }
+  }
+  
+  // Jika formatnya yyyy-MM-dd atau yyyy/MM/dd, ubah menjadi dd-MM-yyyy
+  let parts = str.split(/[-/]/);
+  if (parts.length === 3) {
+    const p0 = parts[0].trim();
+    const p1 = parts[1].trim();
+    const p2 = parts[2].trim();
+    if (p0.length === 4) { // yyyy-MM-dd
+      return `${p2.padStart(2, '0')}-${p1.padStart(2, '0')}-${p0}`;
+    } else if (p2.length === 4) { // dd-MM-yyyy
+      return `${p0.padStart(2, '0')}-${p1.padStart(2, '0')}-${p2}`;
+    }
+  }
+  
+  return str;
+}
+
 function getArsipData(username) {
   try {
     const ss = getSS();
@@ -342,7 +393,7 @@ function getArsipData(username) {
       if (uSheet && uSheet.getLastRow() > 1) {
         const uData = uSheet.getRange(2, 2, uSheet.getLastRow() - 1, 5).getValues();
         for (let i = 0; i < uData.length; i++) {
-          if (uData[i][0] === username) {
+          if (uData[i][0] && uData[i][0].toString().toLowerCase() === username.toString().toLowerCase()) {
             userRole = uData[i][2]; // Column D is index 2 from Col B
             userBidang = uData[i][4] || "Semua"; // Column F is index 4 from Col B
             break;
@@ -365,8 +416,8 @@ function getArsipData(username) {
             noAgenda: row[1],
             kodeKlasifikasi: row[2],
             noSurat: row[3],
-            tglSurat: row[4] instanceof Date ? Utilities.formatDate(row[4], 'Asia/Jakarta', 'dd-MM-yyyy') : (row[4] || '-'),
-            tglTerima: row[5] instanceof Date ? Utilities.formatDate(row[5], 'Asia/Jakarta', 'dd-MM-yyyy') : (row[5] || '-'),
+            tglSurat: formatDateToString(row[4]),
+            tglTerima: formatDateToString(row[5]),
             asalInstansi: row[6],
             instansi: row[6],
             perihal: row[7],
@@ -398,7 +449,7 @@ function getArsipData(username) {
             noAgenda: row[1],
             kodeKlasifikasi: row[2],
             noSurat: row[3],
-            tglSurat: row[4] instanceof Date ? Utilities.formatDate(row[4], 'Asia/Jakarta', 'dd-MM-yyyy') : (row[4] || '-'),
+            tglSurat: formatDateToString(row[4]),
             tujuanInstansi: row[5],
             instansi: row[5],
             perihal: row[6],
@@ -470,9 +521,9 @@ function parseDate(val) {
   let parts = str.split('-');
   if (parts.length === 3) {
     if (parts[0].length === 4) { // yyyy-mm-dd
-      return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+      return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
     } else if (parts[2].length === 4) { // dd-mm-yyyy
-      return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+      return new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
     }
   }
   
@@ -480,9 +531,9 @@ function parseDate(val) {
   parts = str.split('/');
   if (parts.length === 3) {
     if (parts[0].length === 4) { // yyyy/mm/dd
-      return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+      return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
     } else if (parts[2].length === 4) { // dd/mm/yyyy
-      return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+      return new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
     }
   }
   
@@ -492,6 +543,56 @@ function parseDate(val) {
     return new Date(d.getFullYear(), d.getMonth(), d.getDate());
   }
   return null;
+}
+
+// Helper untuk mengonversi tanggal menjadi format ISO string yyyy-MM-dd secara aman & timezone-robust
+function formatDateISO(val) {
+  if (!val) return "";
+  if (val instanceof Date) {
+    const y = val.getFullYear();
+    const m = String(val.getMonth() + 1).padStart(2, '0');
+    const d = String(val.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  
+  const str = val.toString().trim();
+  if (!str || str === '-') return "";
+  
+  // Format yyyy-mm-dd atau dd-mm-yyyy
+  let parts = str.split('-');
+  if (parts.length === 3) {
+    const p0 = parts[0].trim();
+    const p1 = parts[1].trim();
+    const p2 = parts[2].trim();
+    if (p0.length === 4) { // yyyy-mm-dd
+      return `${p0}-${p1.padStart(2, '0')}-${p2.padStart(2, '0')}`;
+    } else if (p2.length === 4) { // dd-mm-yyyy
+      return `${p2}-${p1.padStart(2, '0')}-${p0.padStart(2, '0')}`;
+    }
+  }
+  
+  // Format dd/mm/yyyy atau yyyy/mm/dd
+  parts = str.split('/');
+  if (parts.length === 3) {
+    const p0 = parts[0].trim();
+    const p1 = parts[1].trim();
+    const p2 = parts[2].trim();
+    if (p0.length === 4) { // yyyy/mm/dd
+      return `${p0}-${p1.padStart(2, '0')}-${p2.padStart(2, '0')}`;
+    } else if (p2.length === 4) { // dd/mm/yyyy
+      return `${p2}-${p1.padStart(2, '0')}-${p0.padStart(2, '0')}`;
+    }
+  }
+  
+  const parsed = Date.parse(str);
+  if (!isNaN(parsed)) {
+    const d = new Date(parsed);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+  return "";
 }
 
 // Membersihkan berkas spreadsheet rekap temp yang berumur lebih dari 10 menit
@@ -536,11 +637,15 @@ function downloadDataArsip(username, startDate, endDate) {
     }
     
     // Parse tanggal batas jika ada
-    const startLimit = startDate ? parseDate(startDate) : null;
-    const endLimit = endDate ? parseDate(endDate) : null;
+    let startLimitStr = startDate ? formatDateISO(startDate) : "";
+    let endLimitStr = endDate ? formatDateISO(endDate) : "";
     
-    if (startLimit) startLimit.setHours(0, 0, 0, 0);
-    if (endLimit) endLimit.setHours(23, 59, 59, 999);
+    // Implementasi fallback satu hari (single-day fallback)
+    if (startLimitStr && !endLimitStr) {
+      endLimitStr = startLimitStr;
+    } else if (endLimitStr && !startLimitStr) {
+      startLimitStr = endLimitStr;
+    }
     
     // 3. Tarik & Filter Naskah Masuk
     const masukSheet = ss.getSheetByName('Naskah Masuk');
@@ -560,12 +665,12 @@ function downloadDataArsip(username, startDate, endDate) {
           return; // Bidang tidak cocok
         }
         
-        // Filter Tanggal Surat (row[4] is Tanggal Surat)
-        const docDate = parseDate(row[4]);
-        if (docDate) {
-          if (startLimit && docDate.getTime() < startLimit.getTime()) return;
-          if (endLimit && docDate.getTime() > endLimit.getTime()) return;
-        } else if (startLimit || endLimit) {
+        // Filter Tanggal Surat (row[4] is Tanggal Surat) - string-based comparison
+        const docDateStr = formatDateISO(row[4]);
+        if (docDateStr) {
+          if (startLimitStr && docDateStr < startLimitStr) return;
+          if (endLimitStr && docDateStr > endLimitStr) return;
+        } else if (startLimitStr || endLimitStr) {
           return; // Jika ada filter tanggal tapi tanggal surat kosong, lewati
         }
         
@@ -599,12 +704,12 @@ function downloadDataArsip(username, startDate, endDate) {
           return; // Bidang tidak cocok
         }
         
-        // Filter Tanggal Surat (row[4] is Tanggal Surat)
-        const docDate = parseDate(row[4]);
-        if (docDate) {
-          if (startLimit && docDate.getTime() < startLimit.getTime()) return;
-          if (endLimit && docDate.getTime() > endLimit.getTime()) return;
-        } else if (startLimit || endLimit) {
+        // Filter Tanggal Surat (row[4] is Tanggal Surat) - string-based comparison
+        const docDateStr = formatDateISO(row[4]);
+        if (docDateStr) {
+          if (startLimitStr && docDateStr < startLimitStr) return;
+          if (endLimitStr && docDateStr > endLimitStr) return;
+        } else if (startLimitStr || endLimitStr) {
           return; // Jika ada filter tanggal tapi tanggal surat kosong, lewati
         }
         
@@ -685,9 +790,12 @@ function saveArsip(type, data, username) {
     const sheet = getSS().getSheetByName(sheetName);
     if (!sheet) return { success: false, message: 'Sheet ' + sheetName + ' tidak ditemukan.' };
 
+    const tglSuratObj = parseDate(data.tglSurat) || "-";
+    const tglTerimaObj = type === 'Masuk' ? (parseDate(data.tglTerima) || "-") : "";
+
     const row = type === 'Masuk' ? 
-      [data.noIndeks || '-', data.noAgenda, data.kodeKlasifikasi, data.noSurat, data.tglSurat, data.tglTerima, data.asalInstansi, data.perihal, data.sifatSurat, data.bidang, data.disposisi || '-', data.statusArsip || 'Aktif', data.keterangan || '-', username, data.linkFile || '-', data.jenisSurat || '-', data.keperluan || '-', data.tandaTangan || '-'] :
-      [data.noIndeks || '-', data.noAgenda, data.kodeKlasifikasi, data.noSurat, data.tglSurat, data.tujuanInstansi, data.perihal, data.sifatSurat, data.bidang, data.statusArsip || 'Aktif', data.keterangan || '-', username, data.linkFile || '-', data.jenisSurat || '-', data.keperluan || '-', data.tandaTangan || '-'];
+      [data.noIndeks || '-', data.noAgenda, data.kodeKlasifikasi, data.noSurat, tglSuratObj, tglTerimaObj, data.asalInstansi, data.perihal, data.sifatSurat, data.bidang, data.disposisi || '-', data.statusArsip || 'Aktif', data.keterangan || '-', username, data.linkFile || '-', data.jenisSurat || '-', data.keperluan || '-', data.tandaTangan || '-'] :
+      [data.noIndeks || '-', data.noAgenda, data.kodeKlasifikasi, data.noSurat, tglSuratObj, data.tujuanInstansi, data.perihal, data.sifatSurat, data.bidang, data.statusArsip || 'Aktif', data.keterangan || '-', username, data.linkFile || '-', data.jenisSurat || '-', data.keperluan || '-', data.tandaTangan || '-'];
 
     sheet.appendRow(row);
     logActivity(username, 'Simpan Naskah ' + type, 'Berhasil menyimpan naskah: ' + data.noSurat);
@@ -703,7 +811,7 @@ function saveArsip(type, data, username) {
           nextKeluarAgenda,
           data.kodeKlasifikasi,
           data.noSurat,
-          data.tglSurat,
+          tglSuratObj,
           data.asalInstansi, // Tujuan sama dengan asal
           data.perihal,
           data.sifatSurat,
@@ -775,9 +883,12 @@ function saveArsipWithFile(type, data, username, base64Data, fileName) {
     const sheet = getSS().getSheetByName(sheetName);
     if (!sheet) return { success: false, message: 'Sheet ' + sheetName + ' tidak ditemukan.' };
 
+    const tglSuratObj = parseDate(data.tglSurat) || "-";
+    const tglTerimaObj = type === 'Masuk' ? (parseDate(data.tglTerima) || "-") : "";
+
     const row = type === 'Masuk'
-      ? [data.noIndeks || '-', data.noAgenda, data.kodeKlasifikasi, data.noSurat, data.tglSurat, data.tglTerima, data.instansi, data.perihal, data.sifatSurat, data.bidang, data.disposisi || '-', data.statusArsip || 'Aktif', data.keterangan || '-', username, fileUrl, data.jenisSurat || '-', data.keperluan || '-', data.tandaTangan || '-']
-      : [data.noIndeks || '-', data.noAgenda, data.kodeKlasifikasi, data.noSurat, data.tglSurat, data.instansi, data.perihal, data.sifatSurat, data.bidang, data.statusArsip || 'Aktif', data.keterangan || '-', username, fileUrl, data.jenisSurat || '-', data.keperluan || '-', data.tandaTangan || '-'];
+      ? [data.noIndeks || '-', data.noAgenda, data.kodeKlasifikasi, data.noSurat, tglSuratObj, tglTerimaObj, data.instansi, data.perihal, data.sifatSurat, data.bidang, data.disposisi || '-', data.statusArsip || 'Aktif', data.keterangan || '-', username, fileUrl, data.jenisSurat || '-', data.keperluan || '-', data.tandaTangan || '-']
+      : [data.noIndeks || '-', data.noAgenda, data.kodeKlasifikasi, data.noSurat, tglSuratObj, data.instansi, data.perihal, data.sifatSurat, data.bidang, data.statusArsip || 'Aktif', data.keterangan || '-', username, fileUrl, data.jenisSurat || '-', data.keperluan || '-', data.tandaTangan || '-'];
 
     sheet.appendRow(row);
     logActivity(username, 'Simpan Naskah ' + type, 'Berhasil menyimpan naskah: ' + data.noSurat + (fileUrl ? ' dengan file' : ' (tanpa file)'));
@@ -793,7 +904,7 @@ function saveArsipWithFile(type, data, username, base64Data, fileName) {
           nextKeluarAgenda,
           data.kodeKlasifikasi,
           data.noSurat,
-          data.tglSurat,
+          tglSuratObj,
           data.instansi, // Tujuan sama dengan asal
           data.perihal,
           data.sifatSurat,
@@ -868,11 +979,14 @@ function updateArsipWithFile(type, oldNoSurat, data, username, base64Data, fileN
     
     if (rowIndex === -1) return { success: false, message: 'Naskah dengan nomor surat lama tidak ditemukan.' };
     
+    const tglSuratObj = parseDate(data.tglSurat) || "-";
+    const tglTerimaObj = type === 'Masuk' ? (parseDate(data.tglTerima) || "-") : "";
+
     // Update the row values
     const rowRange = sheet.getRange(rowIndex, 1, 1, type === 'Masuk' ? 18 : 16);
     const rowValues = type === 'Masuk'
-      ? [[data.noIndeks || '-', data.noAgenda, data.kodeKlasifikasi, data.noSurat, data.tglSurat, data.tglTerima, data.instansi, data.perihal, data.sifatSurat, data.bidang, data.disposisi || '-', data.statusArsip || 'Aktif', data.keterangan || '-', username, fileUrl, data.jenisSurat || '-', data.keperluan || '-', data.tandaTangan || '-']]
-      : [[data.noIndeks || '-', data.noAgenda, data.kodeKlasifikasi, data.noSurat, data.tglSurat, data.instansi, data.perihal, data.sifatSurat, data.bidang, data.statusArsip || 'Aktif', data.keterangan || '-', username, fileUrl, data.jenisSurat || '-', data.keperluan || '-', data.tandaTangan || '-']];
+      ? [[data.noIndeks || '-', data.noAgenda, data.kodeKlasifikasi, data.noSurat, tglSuratObj, tglTerimaObj, data.instansi, data.perihal, data.sifatSurat, data.bidang, data.disposisi || '-', data.statusArsip || 'Aktif', data.keterangan || '-', username, fileUrl, data.jenisSurat || '-', data.keperluan || '-', data.tandaTangan || '-']]
+      : [[data.noIndeks || '-', data.noAgenda, data.kodeKlasifikasi, data.noSurat, tglSuratObj, data.instansi, data.perihal, data.sifatSurat, data.bidang, data.statusArsip || 'Aktif', data.keterangan || '-', username, fileUrl, data.jenisSurat || '-', data.keperluan || '-', data.tandaTangan || '-']];
     
     rowRange.setValues(rowValues);
     logActivity(username, 'Update Naskah ' + type, 'Berhasil memperbarui naskah: ' + data.noSurat);
