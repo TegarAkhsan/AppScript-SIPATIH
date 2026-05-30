@@ -1,7 +1,7 @@
-const SPREADSHEET_ID = '1UFEXxqUh5OKyPVEQh4fmPo0Y2i3FdOd7xXLlyBLN5XU';
-const FOLDER_MASUK_ID = '1nSmgCSCslt3_cG3AS4S63gqSnCbEQNNe';
-const FOLDER_KELUAR_ID = '1P5i0zcrBWa97aAY5fkjMPsqRTpB_bZGX';
-const DRIVE_FOLDER_ID = '1GCrXpEb70cnsTvyTpnglyaSqyto0m_PC'; // Default fallback
+const SPREADSHEET_ID = '1mpvWuxHEAuFqZk6myOhULWf_GsKnkrOEg-M-VH0JbEo';
+const FOLDER_MASUK_ID = '1yv9fmi0iVlWd5RiLgDQCn4PtNSO_eQtc';
+const FOLDER_KELUAR_ID = '18tFBp74BhVQBAcLnyGlKcceB1uR4fMvX';
+const DRIVE_FOLDER_ID = '1yv9fmi0iVlWd5RiLgDQCn4PtNSO_eQtc'; // Default fallback
 
 function doGet() {
   checkAndInitializeBidang();
