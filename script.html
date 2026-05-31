@@ -294,6 +294,7 @@
                         sifatSurat: 'Biasa', 
                         keterangan: '',
                         jenisSurat: '',
+                        jenisSuratLainnya: '',
                         noSurat: '',
                         tglSurat: new Date().toISOString().substring(0, 10),
                         tglTerima: type === 'naskah_masuk' ? new Date().toISOString().substring(0, 10) : '',
@@ -382,7 +383,19 @@
                         if (type === 'naskah_masuk' || type === 'naskah_keluar') {
                             const subType = type === 'naskah_masuk' ? 'Masuk' : 'Keluar';
 
-                            if (this.formData.fileData) {
+                            // Jika pilih Surat Lainnya, ganti nilai jenisSurat dengan teks ketikan
+                            const dataToSave = { ...this.formData };
+                            if (dataToSave.jenisSurat === 'Surat Lainnya') {
+                                if (!dataToSave.jenisSuratLainnya || !dataToSave.jenisSuratLainnya.trim()) {
+                                    this.isLoading = false;
+                                    this.showError('Silakan isi nama jenis surat lainnya terlebih dahulu.');
+                                    return;
+                                }
+                                dataToSave.jenisSurat = dataToSave.jenisSuratLainnya.trim();
+                            }
+                            delete dataToSave.jenisSuratLainnya;
+
+                            if (dataToSave.fileData) {
                                 this.showToast('Memproses dan mengunggah file...', 'info');
                             }
 
@@ -398,10 +411,10 @@
                                     .updateArsipWithFile(
                                         subType,
                                         this.formModal.oldNoSurat,
-                                        this.formData,
+                                        dataToSave,
                                         this.user.username,
-                                        this.formData.fileData || null,
-                                        this.formData.fileName || null
+                                        dataToSave.fileData || null,
+                                        dataToSave.fileName || null
                                     );
                             } else {
                                 google.script.run
@@ -416,10 +429,10 @@
                                     })
                                     .saveArsipWithFile(
                                         subType,
-                                        this.formData,
+                                        dataToSave,
                                         this.user.username,
-                                        this.formData.fileData || null,
-                                        this.formData.fileName || null
+                                        dataToSave.fileData || null,
+                                        dataToSave.fileName || null
                                     );
                             }
 
@@ -837,6 +850,14 @@
             },
 
             onJenisSuratChange() {
+                if (this.formData.jenisSurat === 'Surat Lainnya') {
+                    // Pilih Surat Lainnya: kosongkan kode klasifikasi, biarkan user isi nama sendiri
+                    if (!this.formModal.isEdit) {
+                        this.formData.kodeKlasifikasi = 'LNY';
+                        this.formData.noSurat = '';
+                    }
+                    return;
+                }
                 if (this.formData.jenisSurat) {
                     const option = this.klasifikasiOptions.find(o => o.jenisArsip.toLowerCase() === this.formData.jenisSurat.toLowerCase());
                     if (option) {
